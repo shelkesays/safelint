@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SAFE302 reports a Go package-level `var` only when it is actually mutated (#204).** The rule fired on every package-level `var`, which reported a *construct* rather than the hazard it names. Go's `const` accepts only compile-time basic values, so a package-level slice, map, struct or `-ldflags`-written string **cannot** be a `const`: the rule was flagging an idiom with no alternative. Measured on fzf, 120 findings with 97% in library code, the largest non-structural default code in the project.
+
+  The result was the wrong way round, which is the part that made it actively harmful:
+
+  ```go
+  // a.go -> 2 findings, no hazard possible
+  var version = "dev"                             // written by -ldflags; const impossible
+  var defaultShapes = []string{"round", "sharp"}  // a slice cannot be const at all
+
+  // b.go -> 1 finding, the real hazard
+  var counter int
+  func Inc()   { counter++ }
+  func Reset() { counter = 0 }
+  ```
+
+  The harmless file outscored the hazardous one, so triage by count pointed away from the problem. On that example the rule now reports `counter` alone.
+
+  Four shapes count as mutation, each confirmed against the grammar: assignment (`x = v`, `x += v`), increment or decrement, a write to the var's **contents** (`shapes[0] = v`, `cfg.Field = v`, which never rebind the name and would have been missed by a bare-identifier check), and address-of (`&x`, which hands mutation rights to whoever receives the pointer even though no write is visible). A sentinel error (`var ErrNF = errors.New(...)`) is never reassigned and is now clean - the old test suite asserted that sentinels *should* fire, which was documenting the defect.
+
+  **Limit, stated rather than left to be discovered:** mutation is detected per file, as everything in safelint is, so a `var` declared in one file and written only from another file in the same package is missed. The detector is also not scope-aware, so a function-local `x := 1; x = 2` keeps a package-level `x` reporting - the conservative direction, preserving the old behaviour for that name rather than inventing a false negative.
+
+  Same design mistake as #201 (SAFE305 on every JavaScript `var`) and fixed the same way: report where the hazard is observable, and name it in the message. **Bundled skill content changed: run `safelint skill install --force`.**
+
 - **SAFE000 on a Rust `str!` / `i32!` macro now names the real cause instead of blaming your syntax (#174).** `tree-sitter-rust` cannot parse a macro whose name is a primitive type keyword: the lexer resolves the word as a type token before it can be a macro identifier, and `<primitive> !` is not a valid invocation in the grammar. The file gets a `SAFE000` and **every rule reports nothing for it** - worse than a false positive, because a false positive is visible and suppressible while this silently removes a file from analysis. Found on ruff, where 3 affected files sat among 6,066 findings.
 
   Not obscure: `str!` is [snapbox](https://docs.rs/snapbox)'s inline-snapshot macro, so any crate using inline snapshots loses those files. Still unfixable by a dependency bump, which was checked rather than assumed: `tree-sitter-rust` 0.24.2 remains the latest release on PyPI and still fails.
