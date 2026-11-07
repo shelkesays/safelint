@@ -2090,7 +2090,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2180-2026-11-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.18.0 - 2026-11-07
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.18.0 - 2026-11-07">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4602,7 +4613,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2180-2026-11-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.18.0 - 2026-11-07
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.18.0 - 2026-11-07">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -7008,7 +7030,8 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.17.2...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.18.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="2180-2026-11-07"><a href="https://github.com/shelkesays/safelint/compare/v2.17.2...v2.18.0">2.18.0</a> - 2026-11-07<a class="headerlink" href="#2180-2026-11-07" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>The run summary now says how many files it could not analyse (#175).</strong> A parse failure removes a file from analysis entirely: one <code>SAFE000</code> is emitted and then every rule skips it. The summary counted it in <code>files_checked</code> as though it had been examined, so a clean report over a tree where a quarter of the files were never read looked identical to a genuinely clean project. On the validation corpora the signal was invisible in practice: 3 parse errors among 6,066 findings on ruff, 46 among ~2,900 on superset, and 25-54% of files on real C/C++ projects (#206).</li>
