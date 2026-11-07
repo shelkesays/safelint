@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from safelint.core import _diagnostics
 from safelint.languages import JAVASCRIPT, TSX, TYPESCRIPT
 from safelint.languages import rust as _rust
 from safelint.languages._node_utils import resolve_lang_name, walk
@@ -235,6 +236,44 @@ def _canonical_path(p: Path) -> Path:
         return p.absolute()
 
 
+def _warn_if_no_changed_path_exists(changed: list[str], resolved: frozenset[Path]) -> None:
+    """Warn once when no changed-file path can be located on disk.
+
+    SAFE702 compares the file being linted against the changed set by
+    canonical path. When the two are spelled differently the comparison simply
+    finds nothing, and "this file did not change" is indistinguishable from
+    "I could not match your paths": the rule skips every file and the run looks
+    clean. That silent false negative is #265, where a strict path passed on
+    Windows and failed the same commit on Linux CI.
+
+    The trigger is deliberately "**none** of them exist" rather than "some are
+    missing". A changed set legitimately contains paths that are gone (a commit
+    that deletes files), so warning per missing entry would be noise; a set in
+    which nothing at all resolves is a mis-spelled set, not a deletion.
+
+    Follows the project's typo-guard convention: one ``safelint: warning:`` line
+    on stderr, never a failed run.
+    """
+    if not changed:
+        return
+    # ``Path.exists()`` re-raises OSError for a non-ignored errno (an unreadable
+    # ancestor, say), so guard it: a diagnostic must never be the thing that
+    # crashes the run. Same shape and same annotation as ``_canonical_path`` and
+    # ``_test_dir_contains`` above.
+    try:
+        if any(path.exists() for path in resolved):
+            return
+    except OSError:  # nosafe: SAFE203
+        return
+    sample = min(changed)
+    _diagnostics.print_warning(
+        f"none of the {len(changed)} changed-file path(s) could be located on disk, so test coupling (SAFE702) "
+        f"will not apply to any file (first: {sample!r}). Supply paths as safelint sees them: relative to the "
+        "working directory, or absolute including the drive on Windows. An MSYS / Git Bash path such as "
+        "/c/project/src/app.ts has no drive letter, so Windows resolves it under the current drive and it never matches."
+    )
+
+
 def _path_in_changed_set(path: Path, changed_resolved: frozenset[Path]) -> bool:
     """Return True if *path* (canonicalised) is in the pre-resolved *changed_resolved* set.
 
@@ -363,7 +402,11 @@ class TestCouplingRule(BaseRule):
         changed = self.config["_changed_files"]
         cached = getattr(self, "_resolved_changed_cache", None)
         if cached is None or cached[0] is not changed:
-            cached = (changed, frozenset(_canonical_path(Path(f)) for f in changed))
+            resolved = frozenset(_canonical_path(Path(f)) for f in changed)
+            # The cache-miss branch runs once per distinct changed set, which is
+            # once per run, so this is the right place for a run-level warning.
+            _warn_if_no_changed_path_exists(changed, resolved)
+            cached = (changed, resolved)
             self._resolved_changed_cache = cached
         return cached[1]
 

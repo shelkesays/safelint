@@ -46,11 +46,23 @@ def _path_components_contain(haystack: tuple[str, ...], needle: tuple[str, ...])
     handles both single-component (``"tests"``) and nested (``"tests/unit"``)
     forms - a plain ``in path.parts`` membership check would only match the
     single-component case.
+
+    Components are compared through ``os.path.normcase``, which makes the match
+    case-insensitive on Windows and leaves it **case-sensitive on POSIX** (there
+    ``normcase`` is the identity function, so nothing about Linux or macOS
+    behaviour changes). Without it safelint contradicted itself on Windows:
+    ``Path.__eq__`` case-folds there, so the changed-set membership test treats
+    two spellings of one path as the same file, while this raw tuple comparison
+    did not. A ``test_dirs`` entry of ``packages/core/src/test`` then matched
+    nothing when the path on disk was ``packages/Core/src/Test``, silently
+    mis-scoping SAFE601 / SAFE701 / SAFE702 across the whole tree.
     """
     if not needle:
         return False
-    n = len(needle)
-    return any(haystack[i : i + n] == needle for i in range(len(haystack) - n + 1))
+    folded_needle = tuple(os.path.normcase(part) for part in needle)
+    folded_haystack = tuple(os.path.normcase(part) for part in haystack)
+    n = len(folded_needle)
+    return any(folded_haystack[i : i + n] == folded_needle for i in range(len(folded_haystack) - n + 1))
 
 
 def _normalised_parts(path: Path) -> tuple[str, ...]:
