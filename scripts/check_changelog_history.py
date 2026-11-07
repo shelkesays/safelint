@@ -35,6 +35,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from typing import NamedTuple
 
 
 #: A dated release heading: ``## [2.18.0] - 2026-11-07``. The date is required,
@@ -94,6 +95,55 @@ def _git_show(ref: str, path: str) -> str | None:
     return done.stdout if done.returncode == 0 else None
 
 
+class _Verdict(NamedTuple):
+    """What changed between the base and head changelogs."""
+
+    shared: int
+    missing: list[str]
+    changed: list[str]
+    changed_links: list[str]
+
+    @property
+    def has_findings(self) -> bool:
+        """True when anything about a released version differs."""
+        return bool(self.missing or self.changed or self.changed_links)
+
+
+def _compare(base_text: str, head_text: str) -> _Verdict:
+    """Compare every released section and footer that the two texts share.
+
+    Split out of ``main`` to keep it under safelint's own complexity bar, which
+    its self-lint caught at 11 against a max of 10.
+    """
+    base_sections, head_sections = _dated_sections(base_text), _dated_sections(head_text)
+    # A version in the base but not the head means its heading was DELETED or
+    # renamed, which loses the notes outright rather than editing them - worse
+    # than what this check was written for, and it passed, because comparing
+    # only the shared versions never looked at it (#279 review).
+    missing = sorted(set(base_sections) - set(head_sections))
+    shared = sorted(set(base_sections) & set(head_sections))
+    changed = [v for v in shared if base_sections[v] != head_sections[v]]
+
+    base_links, head_links = _footer_links(base_text), _footer_links(head_text)
+    shared_links = sorted(set(base_links) & set(head_links) & set(base_sections))
+    changed_links = [v for v in shared_links if base_links[v] != head_links[v]]
+    return _Verdict(shared=len(shared), missing=missing, changed=changed, changed_links=changed_links)
+
+
+def _read_head(path: Path) -> str | None:
+    """Return *path*'s text, or None when it cannot be read.
+
+    ``read_text`` raises on an unreadable or undecodable file, which would have
+    crashed with a traceback instead of the documented "cannot tell" exit (#279
+    review). A guard that dies noisily is nearly as bad as one that passes
+    quietly: either way CI stops telling you about the thing it was added for.
+    """
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
 def _report(kind: str, differing: list[str]) -> None:
     """Print one explanatory block for the versions that changed."""
     print(f"\nCHANGELOG history changed: {kind} edited for already-released version(s): {', '.join(differing)}", file=sys.stderr)
@@ -114,30 +164,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--changelog", default="CHANGELOG.md", help="path to the changelog (default: CHANGELOG.md)")
     args = parser.parse_args(argv)
 
-    head_text = Path(args.changelog).read_text(encoding="utf-8") if Path(args.changelog).is_file() else None
+    head_text = _read_head(Path(args.changelog))
     if head_text is None:
-        print(f"cannot tell: {args.changelog} is not a file in the working tree", file=sys.stderr)
+        print(f"cannot tell: could not read {args.changelog} from the working tree", file=sys.stderr)
         return _EXIT_CANNOT_TELL
     base_text = _git_show(args.base_ref, args.changelog)
     if base_text is None:
         print(f"cannot tell: could not read {args.changelog} at {args.base_ref}", file=sys.stderr)
         return _EXIT_CANNOT_TELL
 
-    base_sections, head_sections = _dated_sections(base_text), _dated_sections(head_text)
-    shared = sorted(set(base_sections) & set(head_sections))
-    changed = [v for v in shared if base_sections[v] != head_sections[v]]
-
-    base_links, head_links = _footer_links(base_text), _footer_links(head_text)
-    shared_links = sorted(set(base_links) & set(head_links) & set(base_sections))
-    changed_links = [v for v in shared_links if base_links[v] != head_links[v]]
-
-    if not changed and not changed_links:
-        print(f"CHANGELOG history intact: {len(shared)} released section(s) unchanged against {args.base_ref}")
+    verdict = _compare(base_text, head_text)
+    if not verdict.has_findings:
+        print(f"CHANGELOG history intact: {verdict.shared} released section(s) unchanged against {args.base_ref}")
         return _EXIT_OK
-    if changed:
-        _report("section body", changed)
-    if changed_links:
-        _report("compare-link footer", changed_links)
+    if verdict.missing:
+        _report("whole section deleted or renamed", verdict.missing)
+    if verdict.changed:
+        _report("section body", verdict.changed)
+    if verdict.changed_links:
+        _report("compare-link footer", verdict.changed_links)
     return _EXIT_EDITED
 
 
