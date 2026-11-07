@@ -258,8 +258,14 @@ def test_an_oversize_file_counts_as_lost_coverage(tmp_path: Path) -> None:
     assert result.violations == []  # no violation, which is exactly why the flag matters
 
 
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="os.mkfifo is POSIX-only; Windows has no FIFO to create")
 def test_a_non_regular_file_counts_as_lost_coverage(tmp_path: Path) -> None:
-    """A FIFO is refused before reading, and that is still lost coverage."""
+    """A FIFO is refused before reading, and that is still lost coverage.
+
+    Skipped on Windows, which has no ``os.mkfifo`` at all. The guard it tests
+    is platform-independent and the oversize case above covers the same
+    code path on every platform, so nothing is left unverified there.
+    """
     fifo = tmp_path / "pipe.py"
     os.mkfifo(fifo)
 
