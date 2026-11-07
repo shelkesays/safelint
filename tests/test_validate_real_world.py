@@ -563,7 +563,10 @@ def test_the_include_walk_prunes_harness_excluded_trees(tmp_path: Path, monkeypa
 
     assert str(project) in visited, "the project root is walked"
     assert str(project / "src") in visited, "non-excluded subtrees are still walked"
-    descended = [v for v in visited if "node_modules" in v]
+    # Must match the directory the fixture actually creates. It said
+    # "node_modules" while the fixture built "vendor", so it passed vacuously
+    # and verified nothing - caught in review on #273.
+    descended = [v for v in visited if "vendor" in v]
     assert descended == [], f"excluded trees must not be entered, but walked: {descended}"
 
 
@@ -654,3 +657,41 @@ def test_a_language_that_was_read_passes(tmp_path: Path) -> None:
     payload = {"summary": {"files_checked": 12, "files_checked_by_language": {"python": 12}}}
 
     harness._check_language_was_read(payload, target, "defaults")
+
+
+def test_an_include_pointing_only_into_an_unscanned_tree_is_an_error(tmp_path: Path) -> None:
+    """The sixth false-clean route, opened and closed during #273's review.
+
+    Deleting the harness's mirror of safelint's exclusions made this pass: an
+    ``--include`` matching only files under ``.venv/`` satisfied the pre-flight,
+    the project-wide per-language tally stayed positive on the real source
+    elsewhere, the findings filtered to empty, and the run would have been
+    written up as a clean result for a subtree never examined.
+
+    The per-language tally cannot catch it, which is the whole reason the
+    exclusion list had to come back: it is project-wide, while ``--include`` is
+    a harness-side filter safelint never sees.
+    """
+    project = tmp_path / "proj"
+    (project / "src").mkdir(parents=True)
+    (project / "src" / "real.py").write_text("x = 1\n", encoding="utf-8")
+    (project / ".venv" / "lib").mkdir(parents=True)
+    (project / ".venv" / "lib" / "dep.py").write_text("y = 2\n", encoding="utf-8")
+
+    harness = _load_harness()
+    target = harness.Target(Path("safelint"), "python", project, "venv-include", include=".venv/")
+
+    with pytest.raises(harness.HarnessError, match="selects no python file"):
+        harness._check_include_selects_files(target)
+
+
+def test_an_include_into_a_real_subtree_still_passes(tmp_path: Path) -> None:
+    """No false positives: a legitimate include is unaffected by that pruning."""
+    project = tmp_path / "proj"
+    (project / "src").mkdir(parents=True)
+    (project / "src" / "real.py").write_text("x = 1\n", encoding="utf-8")
+
+    harness = _load_harness()
+    target = harness.Target(Path("safelint"), "python", project, "ok", include="src/")
+
+    harness._check_include_selects_files(target)
