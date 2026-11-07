@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING
+from urllib.parse import quote
 
 from safelint import __version__
 from safelint.formatters import RunCoverage, format_json, format_sarif
@@ -423,11 +424,12 @@ def test_sarif_artifact_uri_falls_back_for_paths_outside_cwd(tmp_path: Path, mon
     drive, so the URI is ``C:/outside/foo.py``. Separator normalisation is the
     invariant that holds everywhere and is what the function exists for.
 
-    Whether a drive-lettered absolute path is a *conformant* SARIF URI is a
-    separate question - RFC 3986 says a relative reference must not carry a
-    colon in its first segment, so strictly it wants ``file:///C:/...``. That is
-    tracked on its own rather than changed inside an unrelated fix, since it
-    alters output that GitHub code scanning consumes.
+    safelint already handles the RFC 3986 trap here, which the Windows job is
+    what proved: a relative reference must not carry a colon in its first
+    segment or it parses as a scheme, and ``quote(..., safe="/")`` percent-
+    encodes the drive colon, so the URI is ``C%3A/outside/foo.py`` rather than
+    an ambiguous ``C:/outside/foo.py``. Asserted explicitly so a future change
+    to the ``safe`` set cannot quietly reintroduce the ambiguity.
     """
     monkeypatch.chdir(tmp_path)
     outside = tmp_path.parent / "outside" / "foo.py"
@@ -436,7 +438,7 @@ def test_sarif_artifact_uri_falls_back_for_paths_outside_cwd(tmp_path: Path, mon
     doc = json.loads(out)
     uri = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
 
-    assert uri == outside.as_posix()  # absolute, platform-appropriate
+    assert uri == quote(outside.as_posix(), safe="/")  # absolute, platform-appropriate
     assert "\\" not in uri  # the invariant: never a Windows separator
 
 
