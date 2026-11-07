@@ -87,7 +87,7 @@ C uses line-comment directives (`//` form): `// nosafe` (all rules on the line),
 | [SAFE101](../configuration/rules.md#safe101-function_length) | function_length | Source lines on `function_definition`. |
 | [SAFE102](../configuration/rules.md#safe102-nesting_depth) | nesting_depth | `if` / `for` / `while` / `do` / `switch`. |
 | [SAFE103](../configuration/rules.md#safe103-max_arguments) | max_arguments | `parameter_declaration` count; `void` is zero args. |
-| [SAFE104](../configuration/rules.md#safe104-complexity) | complexity | `if`/loops/ternary + `&&` / `||`, plus one for a whole `switch` (not one per `case`). |
+| [SAFE104](../configuration/rules.md#safe104-complexity) | complexity | `if`/loops/ternary + `&&` / `\|\|`, plus one for a whole `switch` (not one per `case`). |
 | [SAFE105](../configuration/rules.md#safe105-no_recursion) | no_recursion | Direct self-recursion. |
 | [SAFE302](../configuration/rules.md#safe302-global_mutation) | global_mutation | File-scope mutable `declaration`; `const` / `typedef` / `extern` / prototypes exempt; `static` counts. |
 | [SAFE303](../configuration/rules.md#safe303-side_effects_hidden) | side_effects_hidden | Pure-named function doing C I/O (`io_functions_c`). |

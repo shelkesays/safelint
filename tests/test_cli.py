@@ -171,12 +171,12 @@ def test_file_summary_line_empty_violations_raises() -> None:
 
 def test_skipped_line_is_singular_for_one_file() -> None:
     """Agreement matters here: the line is read by people, not parsed."""
-    assert _strip(_make_skipped_line(1)) == "1 file could not be parsed and was NOT analysed."
+    assert _strip(_make_skipped_line(1)) == "1 file was NOT analysed (unparseable, unreadable, or skipped before reading)."
 
 
 def test_skipped_line_is_plural_for_several_files() -> None:
     """Both the noun and the verb have to move."""
-    assert _strip(_make_skipped_line(3)) == "3 files could not be parsed and were NOT analysed."
+    assert _strip(_make_skipped_line(3)) == "3 files were NOT analysed (unparseable, unreadable, or skipped before reading)."
 
 
 def test_skipped_line_follows_the_all_clear_on_a_clean_run(capsys: pytest.CaptureFixture[str]) -> None:
@@ -192,7 +192,7 @@ def test_skipped_line_follows_the_all_clear_on_a_clean_run(capsys: pytest.Captur
     lines = [_strip(line) for line in capsys.readouterr().out.splitlines() if line.strip()]
     assert lines == [
         "All checks passed.",
-        "2 files could not be parsed and were NOT analysed.",
+        "2 files were NOT analysed (unparseable, unreadable, or skipped before reading).",
     ]
 
 
@@ -222,7 +222,7 @@ def test_hook_mode_still_reports_lost_coverage_on_a_clean_run(capsys: pytest.Cap
     )
 
     out = _strip(capsys.readouterr().out)
-    assert out.strip() == "2 files could not be parsed and were NOT analysed."
+    assert out.strip() == "2 files were NOT analysed (unparseable, unreadable, or skipped before reading)."
     assert "All checks passed." not in out  # the #50 silence contract is otherwise intact
 
 

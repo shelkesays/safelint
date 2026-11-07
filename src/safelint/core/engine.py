@@ -370,20 +370,27 @@ class LintResult:
     ``# nosafe`` directives or per-file ignore patterns. Use ``len(...)`` for
     the count and iterate to inspect codes/rules/lines.
 
-    ``parse_failed`` is True when the file could not be turned into a usable
-    tree, so **no rule ran against it**: it was reached but not analysed. It
-    exists because callers cannot infer that from the violation list: a
-    ``SAFE000`` violation disappears under ``ignore = ["SAFE000"]`` while the
-    coverage gap it stood for does not (#175). The default is False on every
-    other path, including a file that was excluded or whose language is not
-    registered, because nothing was attempted for those and they are not lost
-    coverage.
+    ``analysis_skipped`` is True when safelint reached the file and produced no
+    analysis of it, so **no rule ran against it**. Four ways that happens: a
+    tree-sitter parse failure, an unreadable file, one larger than
+    ``max_file_size_bytes``, and one refused before reading (a symlink escaping
+    the tree, or a non-regular file such as a FIFO).
+
+    It exists because callers cannot infer any of that from the violation list.
+    A ``SAFE000`` violation disappears under ``ignore = ["SAFE000"]`` while the
+    coverage gap it stood for does not, and the pre-read refusals never produce
+    a violation at all - only a stderr warning (#175).
+
+    The default is False for a file that was **excluded** or whose language is
+    not registered: nothing was attempted for those, they are out of scope by
+    configuration rather than lost, and counting them would make
+    ``files_analysed`` meaningless on any project with an exclude list.
     """
 
     path: str
     violations: list[Violation] = field(default_factory=list)
     suppressed: list[Violation] = field(default_factory=list)
-    parse_failed: bool = False
+    analysis_skipped: bool = False
 
     @property
     def has_violations(self) -> bool:
@@ -399,14 +406,14 @@ class SafetyEngine:
         config: dict[str, Any],
         changed_files: list[str] | None = None,
         cache: _cache.LintCache | None = None,
+        *,
+        stdin_mode: bool = False,
     ) -> None:
         """Build the ordered, active rule set from *config*.
 
-        *cache* is an optional :class:`safelint.core._cache.LintCache`. If
-        provided (and not pointing at ``None``), per-file lint results are
-        memoised by ``sha256(source + engine_fingerprint + filepath)`` so
-        re-runs on unchanged files become essentially instant. Pass
-        ``None`` (the default) to disable caching.
+        *cache* memoises per-file results by ``sha256(source + fingerprint +
+        filepath)``; ``None`` (the default) disables it. *stdin_mode* tells
+        SAFE702 the changed path names a buffer that need not exist on disk.
         """
         rules_cfg: dict[str, Any] = config.get("rules", {})
         exec_cfg: dict[str, Any] = config.get("execution", {})
@@ -431,7 +438,7 @@ class SafetyEngine:
         ignored_names: frozenset[str] = frozenset(raw_ignore)
         ignored_codes_upper: frozenset[str] = frozenset(e.upper() for e in raw_ignore)
 
-        self.rules: list[BaseRule] = self._build_active_rules(rules_cfg, exec_cfg, ignored_names, ignored_codes_upper, changed_files)
+        self.rules: list[BaseRule] = self._build_active_rules(rules_cfg, exec_cfg, ignored_names, ignored_codes_upper, changed_files, stdin_mode=stdin_mode)
         # Per-file ignores can't suppress engine-internal codes (SAFE000
         # fires before per-file matching; SAFE004 only honours the
         # global ``ignore`` list), so validate against the narrower set
@@ -461,6 +468,8 @@ class SafetyEngine:
         ignored_names: frozenset[str],
         ignored_codes_upper: frozenset[str],
         changed_files: list[str] | None,
+        *,
+        stdin_mode: bool = False,
     ) -> list[BaseRule]:
         """Return the ordered list of active rules derived from config."""
         order: list[str] = exec_cfg.get("order", [r.name for r in ALL_RULES])
@@ -475,6 +484,9 @@ class SafetyEngine:
                 continue
             if cls is TestCouplingRule and changed_files is not None:
                 rule_cfg["_changed_files"] = changed_files
+                # ``--stdin`` names a BUFFER, which need not exist on disk, so the
+                # unmatchable-path warning would fire on every run (#274 review).
+                rule_cfg["_stdin_mode"] = stdin_mode
             active_rules.append(cls(rule_cfg))
         return sorted(active_rules, key=lambda r: order_index.get(r.name, len(order)))
 
@@ -652,7 +664,7 @@ class SafetyEngine:
         ``end_lineno == lineno`` so editors can render a precise marker
         rather than underlining the whole line.
 
-        Every result built here carries ``parse_failed=True``: this is the one
+        Every result built here carries ``analysis_skipped=True``: this is the one
         constructor for "safelint produced nothing but an error for this file",
         which covers a tree-sitter parse failure and an unreadable file alike.
         Both mean no rule ran, which is what the skipped-file count reports.
@@ -660,7 +672,7 @@ class SafetyEngine:
         end = lineno if column is not None else None
         return LintResult(
             path=filepath,
-            parse_failed=True,
+            analysis_skipped=True,
             violations=[
                 Violation(
                     rule="parse",
@@ -793,7 +805,7 @@ class SafetyEngine:
         """
         if _symlink_escapes(path_obj, Path.cwd().resolve()):
             _diagnostics.print_warning(f"skipping {filepath} (symlink escapes the tree)")
-            return LintResult(path=filepath)
+            return LintResult(path=filepath, analysis_skipped=True)
         try:
             is_regular = path_obj.is_file()
         # Stat denial / device read errors (lstat or stat): fail-open so
@@ -803,7 +815,7 @@ class SafetyEngine:
             return None
         if not is_regular:
             _diagnostics.print_warning(f"skipping {filepath} (not a regular file)")
-            return LintResult(path=filepath)
+            return LintResult(path=filepath, analysis_skipped=True)
         try:
             size = path_obj.stat().st_size
         # Same fail-open posture as is_file() above.
@@ -811,7 +823,7 @@ class SafetyEngine:
             return None
         if size > self.max_file_size_bytes:
             _diagnostics.print_warning(f"skipping {filepath} ({size:,} bytes exceeds max_file_size_bytes={self.max_file_size_bytes:,})")
-            return LintResult(path=filepath)
+            return LintResult(path=filepath, analysis_skipped=True)
         return None
 
     def check_file(self, filepath: str) -> LintResult:
@@ -888,7 +900,7 @@ class SafetyEngine:
             # Parse errors are emitted by the engine, not by a registered
             # BaseRule, so their suppression is handled here directly.
             if self._engine_internal_ignored("SAFE000", "parse"):
-                return LintResult(path=filepath, violations=[], suppressed=[], parse_failed=True)
+                return LintResult(path=filepath, violations=[], suppressed=[], analysis_skipped=True)
             return self._build_parse_error_result(filepath, tree.root_node, lang)
 
         # Single tree walk - produces both line-level ``# nosafe``
