@@ -79,23 +79,38 @@ jobs:
       # platform-dependent, not Python-version-dependent, so a second Windows
       # Python would mostly re-run the same assertions at twice the cost.
       # 3.12 is the midpoint of the supported range.
+      #
+      # ``pytest_args`` carries ``--no-cov`` on Windows. Coverage is enforced on
+      # the canonical environment (the Ubuntu jobs, which gate at 97%); on
+      # Windows a number of tests are legitimately skipped - a filename with a
+      # control character cannot exist there, and the harness fixtures are
+      # ``#!/bin/sh`` scripts Windows cannot execute - so their lines never run
+      # and the percentage is structurally lower (96.90% when measured).
+      # Enforcing the same threshold on both would force a choice between
+      # deleting honest skips and lowering the gate for everyone. This job is
+      # here to catch platform BEHAVIOUR, which it does either way.
       matrix:
         include:
           - os: ubuntu-latest
             python-version: "3.11"
             label: Python 3.11
+            pytest_args: ""
           - os: ubuntu-latest
             python-version: "3.12"
             label: Python 3.12
+            pytest_args: ""
           - os: ubuntu-latest
             python-version: "3.13"
             label: Python 3.13
+            pytest_args: ""
           - os: ubuntu-latest
             python-version: "3.14"
             label: Python 3.14
+            pytest_args: ""
           - os: windows-latest
             python-version: "3.12"
             label: Windows / Python 3.12
+            pytest_args: "--no-cov"
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -112,4 +127,4 @@ jobs:
         run: uv sync --extra dev
 
       - name: Run tests
-        run: uv run pytest tests/ -q
+        run: uv run pytest tests/ -q ${{ matrix.pytest_args }}
