@@ -77,6 +77,45 @@ EXTENSIONS: dict[str, tuple[str, ...]] = {
 #: exclude by default. These are what the harness adds.
 HARNESS_EXCLUDED_DIR_NAMES: tuple[str, ...] = ("vendor", "target", "third_party")
 
+#: Directory names safelint skips by default. This is the ONE piece of
+#: discovery mirroring that survives #192, and it is deliberate rather than an
+#: oversight, so it is scoped and named for exactly what it does.
+#:
+#: It is needed only by the ``--include`` pre-flight. ``--include`` is a
+#: harness-side filter on findings that safelint never sees, so the binary
+#: cannot be asked whether a pattern selects anything it would read. Without
+#: this list an include pointing only into ``.venv/`` passes the pre-flight,
+#: the project-wide per-language tally stays positive on source elsewhere, the
+#: findings filter to empty, and the run is written up as a clean result for a
+#: subtree never examined - a sixth false-clean route, opened by the very
+#: change that removed five. Caught in review on #273.
+#:
+#: What retires it is ``safelint check --list-files`` (option 3 in #192): with
+#: a discovery list from the binary the include could be intersected against
+#: what will actually be read, and this tuple deletes. Until then the drift
+#: risk is bounded to one question - "is this include pointing somewhere
+#: safelint ignores?" - rather than spanning the whole eligibility model.
+SCANNER_EXCLUDED_DIR_NAMES: tuple[str, ...] = (
+    ".venv",
+    "venv",
+    ".tox",
+    ".nox",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".ty_cache",
+    "build",
+    "dist",
+    "htmlcov",
+    "node_modules",
+    "site-packages",
+)
+
+#: Every directory name the ``--include`` pre-flight refuses to look inside:
+#: the trees the harness excludes itself, plus the ones safelint skips anyway.
+INCLUDE_PRUNED_DIR_NAMES: tuple[str, ...] = (*HARNESS_EXCLUDED_DIR_NAMES, *SCANNER_EXCLUDED_DIR_NAMES)
+
 #: The harness-added trees as the glob patterns ``extend_exclude_paths`` wants.
 #: Derived from the names above so the generated config and the eligibility check
 #: cannot drift apart. Only the harness-specific names go here - re-listing
@@ -445,9 +484,11 @@ def _check_include_selects_files(target: Target) -> None:
     zero-findings report for source that was never examined. Those tables are
     gone rather than merely corrected.
 
-    Only the harness's OWN excluded trees are pruned here, because the harness
-    put them in the generated config itself: an include matching nothing but
-    ``vendor/`` legitimately selects nothing scannable.
+    The walk prunes every tree that is never scanned - the harness's own, and
+    safelint's defaults via :data:`SCANNER_EXCLUDED_DIR_NAMES`. That second
+    list is the one piece of mirroring #192 could not remove, because the
+    binary cannot be asked about a filter it never sees; its docstring records
+    why, and what would retire it.
     """
     include = target.include
     if not include:
@@ -460,13 +501,13 @@ def _check_include_selects_files(target: Target) -> None:
     # walk and throw away. It also stops at directory symlinks
     # (``followlinks=False``), which an ``rglob`` can follow.
     for dirpath, dirnames, filenames in os.walk(target.project):
-        dirnames[:] = [d for d in dirnames if d not in HARNESS_EXCLUDED_DIR_NAMES]
+        dirnames[:] = [d for d in dirnames if d not in INCLUDE_PRUNED_DIR_NAMES]
         if _any_include_match(Path(dirpath), filenames, target.project, include, exts):
             return
     msg = (
         f"--include {target.include!r} selects no {target.lang} file under {target.project} - "
         "check the path (it is matched against paths relative to --project), or whether every "
-        f"match sits in a tree the harness excludes ({', '.join(HARNESS_EXCLUDED_DIR_NAMES)})"
+        f"match sits in a tree that is never scanned ({', '.join(INCLUDE_PRUNED_DIR_NAMES)})"
     )
     raise HarnessError(msg)
 

@@ -28,8 +28,8 @@ import pytest
 
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
-from safelint.languages import PYTHON
-from safelint.languages._node_utils import walk
+from safelint.languages import PYTHON, get_language_for_file
+from safelint.languages._node_utils import resolve_lang_name, walk
 from safelint.rules.complexity import _BRANCHING_TYPES_BY_LANG, _FUNCTION_TYPES_BY_LANG, ComplexityRule
 
 
@@ -70,22 +70,38 @@ def _dispatch_sources() -> dict[str, tuple[str, str]]:
     }
 
 
-@pytest.mark.parametrize("label", list(_dispatch_sources()))
-def test_a_flat_dispatch_table_is_not_over_the_cap(tmp_path: Path, label: str) -> None:
-    """A 14-arm dispatch table stays clean in every registered language.
+def _only_function_score(sample: Path) -> int:
+    """Return the cyclomatic score of the single function in *sample*."""
+    lang = get_language_for_file(str(sample))
+    assert lang is not None, sample
+    lang_name = resolve_lang_name(str(sample))
+    tree = lang.create_parser().parse(sample.read_bytes())
+    function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
+    functions = [n for n in walk(tree.root_node) if n.type in function_types]
+    assert len(functions) == 1, f"{sample.name}: expected one function, found {len(functions)}"
+    return ComplexityRule._cyclomatic_complexity(functions[0], lang_name, function_types, _BRANCHING_TYPES_BY_LANG[lang_name])
 
-    Under per-arm counting each of these scored 15 and fired. The parametrised
-    form is the point: a future language, or a future change to one language's
-    node table, cannot quietly reintroduce per-arm counting for only some of
-    them.
+
+@pytest.mark.parametrize("label", list(_dispatch_sources()))
+def test_a_flat_dispatch_table_scores_exactly_two(tmp_path: Path, label: str) -> None:
+    """A 14-arm dispatch table scores exactly 2 in every registered language.
+
+    Asserted as the exact number rather than "under the cap", which was the
+    weaker form this test shipped with: at a cap of 10 it would have passed if
+    the construct counted 0 (switch handling deleted outright) or anything up
+    to 9, so it could not actually pin the one-point rule it exists to protect.
+    Caught in review on #272.
+
+    2 is 1 base + 1 for the construct. Under per-arm counting each of these
+    scored 15. The parametrised form is the rest of the point: a future
+    language, or a change to one language's node table, cannot quietly diverge.
     """
     name, source = _dispatch_sources()[label]
     sample = tmp_path / name
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample)).violations
-
-    assert not [v for v in violations if v.code == "SAFE104"], f"{label}: dispatch table scored over the cap"
+    assert _only_function_score(sample) == 2, f"{label}: a dispatch construct must cost exactly one"
+    assert not [v for v in _engine().check_file(str(sample)).violations if v.code == "SAFE104"]
 
 
 def test_python_match_is_counted_at_all(tmp_path: Path) -> None:
