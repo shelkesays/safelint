@@ -298,8 +298,19 @@ def write_config(directory: Path, target: Target, rule_names: list[str]) -> None
 #: ``--safelint`` names an executable, not a shell pipeline. A binary that is
 #: itself a wrapper script could leave a grandchild behind; that is a limitation
 #: of ``subprocess`` timeouts rather than something this bound pretends to solve.
+#:
+#: ``resource`` is POSIX-only, so it is imported defensively: on Windows the
+#: wrapper still measures wall time and still reports the run, it just has no
+#: peak-RSS figure to give (``rss_mb`` becomes ``None``). Importing it at the
+#: top made the whole harness unusable on Windows with
+#: ``ModuleNotFoundError: No module named 'resource'``, which turned every
+#: harness test into a failure that said nothing about the harness.
 _MEASURED_RUNNER = """
-import json, resource, subprocess, sys, time
+import json, subprocess, sys, time
+try:
+    import resource
+except ModuleNotFoundError:  # Windows has no rusage
+    resource = None
 timeout = float(sys.argv[1])
 t0 = time.perf_counter()
 try:
@@ -307,8 +318,11 @@ try:
     envelope = {"rc": p.returncode, "out": p.stdout, "err": p.stderr}
 except subprocess.TimeoutExpired:
     envelope = {"rc": None, "out": "", "err": "", "timed_out": timeout}
-raw = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
-mb = raw / (1024 * 1024) if sys.platform == "darwin" else raw / 1024
+if resource is None:
+    mb = None
+else:
+    raw = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+    mb = raw / (1024 * 1024) if sys.platform == "darwin" else raw / 1024
 envelope.update({"wall": time.perf_counter() - t0, "rss_mb": mb})
 print(json.dumps(envelope))
 """
@@ -399,7 +413,10 @@ def run_safelint(target: Target, config_dir: Path, mode: str) -> RunResult:
         reason = next((line for line in detail if "no files linted" in line), "safelint gave no reason")
         msg = f"{mode}: safelint read 0 files, so there is nothing to report - {reason}"
         raise HarnessError(msg)
-    result = RunResult(mode, files_checked, violations, float(env["wall"]), float(env["rss_mb"]), env["err"], env["rc"])
+    # ``rss_mb`` is None where the platform has no rusage (Windows); 0.0 keeps
+    # the field a plain float for the report's ``:.0f`` formatting, and reads as
+    # "not measured" rather than pretending to a number.
+    result = RunResult(mode, files_checked, violations, float(env["wall"]), float(env["rss_mb"] or 0.0), env["err"], env["rc"])
     for v in violations:
         code = str(v["code"])
         result.counts[code] = result.counts.get(code, 0) + 1
