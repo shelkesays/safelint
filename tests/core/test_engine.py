@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -346,12 +347,18 @@ def test_engine_discovery_skips_escaping_symlinked_directory_target(tmp_path: Pa
     assert "symlink" in capsys.readouterr().err
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows rejects control characters in filenames (WinError 123), so the attack this guards against cannot be staged there")
 def test_engine_symlink_skip_warning_sanitises_control_chars(tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
     """A symlink whose name carries an ANSI escape is neutralised in the stderr warning.
 
     The skip warning echoes the repo-controlled filepath; without sanitisation a
     crafted symlink name would inject terminal escapes via stderr (the channel the
     pretty-renderer sanitiser does not cover).
+
+    Skipped on Windows rather than adapted: the Win32 API refuses to create a
+    filename containing a control character at all, so there is no such file to
+    lint and nothing for the sanitiser to neutralise. The guard itself is
+    platform-independent and stays covered by the POSIX jobs.
     """
     repo = tmp_path / "repo"
     repo.mkdir()

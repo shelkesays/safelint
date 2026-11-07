@@ -339,6 +339,29 @@ def _symlink_escapes(path: Path, root_real: Path) -> bool:
     return looped or not real.is_relative_to(root_real)
 
 
+#: True on Windows. A module constant rather than an inline ``os.name`` check so
+#: tests can exercise both platforms' behaviour on either host.
+_IS_WINDOWS = os.name == "nt"
+
+
+def _normalise_exclude_pattern(pattern: str) -> str:
+    r"""Return *pattern* with Windows separators folded to ``/`` **on Windows only**.
+
+    Exclusion matching compares a path normalised with ``Path.as_posix()``
+    against the raw configured pattern. On Windows that was unmatchable: any
+    pattern carrying backslashes - which is what ``str(Path(...))`` produces and
+    what a Windows user naturally writes - could never equal a forward-slash
+    path, so ``exclude_paths = ["C:\\vendor"]`` silently excluded nothing and
+    the whole tree got linted.
+
+    Guarded to Windows because a backslash is a legitimate **escape character**
+    in a POSIX glob (``fnmatch`` honours it), so rewriting patterns everywhere
+    would change documented behaviour on Linux and macOS for a Windows-only
+    problem.
+    """
+    return pattern.replace("\\", "/") if _IS_WINDOWS else pattern
+
+
 @dataclass
 class LintResult:
     """Aggregated violations for a single linted file.
@@ -477,7 +500,11 @@ class SafetyEngine:
         """
         base = _validated_string_list(config.get("exclude_paths", DEFAULTS["exclude_paths"]), "exclude_paths")
         extend = _validated_string_list(config.get("extend_exclude_paths", []), "extend_exclude_paths")
-        return [*base, *extend]
+        # Normalised once here rather than per candidate path: both
+        # ``_is_excluded`` and ``_is_excluded_dir`` match against the resolved
+        # list, so one pass at construction fixes both and costs nothing on the
+        # per-file hot path.
+        return [_normalise_exclude_pattern(p) for p in (*base, *extend)]
 
     @staticmethod
     def _resolve_max_file_size_bytes(config: dict[str, Any]) -> int:

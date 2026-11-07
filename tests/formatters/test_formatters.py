@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING
+from urllib.parse import quote
 
 from safelint import __version__
 from safelint.formatters import RunCoverage, format_json, format_sarif
@@ -416,16 +417,29 @@ def test_sarif_artifact_uri_makes_absolute_paths_repo_relative(tmp_path: Path, m
 
 
 def test_sarif_artifact_uri_falls_back_for_paths_outside_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Absolute paths outside cwd fall back to the absolute POSIX form."""
+    """Absolute paths outside cwd fall back to the absolute POSIX form.
+
+    Asserted against ``Path.as_posix()`` rather than a hardcoded leading ``/``,
+    which was a POSIX-only assumption: on Windows the absolute form keeps its
+    drive, so the URI is ``C:/outside/foo.py``. Separator normalisation is the
+    invariant that holds everywhere and is what the function exists for.
+
+    safelint already handles the RFC 3986 trap here, which the Windows job is
+    what proved: a relative reference must not carry a colon in its first
+    segment or it parses as a scheme, and ``quote(..., safe="/")`` percent-
+    encodes the drive colon, so the URI is ``C%3A/outside/foo.py`` rather than
+    an ambiguous ``C:/outside/foo.py``. Asserted explicitly so a future change
+    to the ``safe`` set cannot quietly reintroduce the ambiguity.
+    """
     monkeypatch.chdir(tmp_path)
-    elsewhere = str(tmp_path.parent / "outside" / "foo.py")
-    v = Violation(rule="function_length", code="SAFE101", filepath=elsewhere, lineno=1, message="m", severity="error")
+    outside = tmp_path.parent / "outside" / "foo.py"
+    v = Violation(rule="function_length", code="SAFE101", filepath=str(outside), lineno=1, message="m", severity="error")
     out = format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1)
     doc = json.loads(out)
     uri = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
-    # No drive letter, no backslashes - but it's still absolute (starts with /).
-    assert uri.startswith("/")
-    assert "\\" not in uri
+
+    assert uri == quote(outside.as_posix(), safe="/")  # absolute, platform-appropriate
+    assert "\\" not in uri  # the invariant: never a Windows separator
 
 
 def test_sarif_artifact_uri_percent_encodes_special_chars() -> None:
