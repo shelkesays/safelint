@@ -61,13 +61,21 @@ Aggregated counts across the whole run. All counts are integers ≥ 0.
 
 `files_checked` on its own overstates what was analysed, which is what [#175](https://github.com/shelkesays/safelint/issues/175) was filed about. A file that fails to parse is read, counted, and then skipped by every rule, so a run can report `files_checked: 1101` with a quarter of that never analysed (measured on real C projects: see [Parse coverage](languages/c.md#parse-coverage-the-preprocessor-limit)).
 
-For a coverage assertion in CI, use `files_analysed` and treat a non-zero `files_skipped` as a signal rather than noise:
+For a coverage assertion in CI, use `files_analysed` and treat a non-zero `files_skipped` as a signal rather than noise. To **fail** the job when anything was skipped, let `jq -e` set the exit status and do not swallow it:
 
 ```bash
 safelint check . --all-files --format json \
-  | jq -e '.summary.files_skipped == 0' > /dev/null \
-  || echo "warning: some files were not analysed"
+  | jq -e '.summary.files_skipped == 0' > /dev/null
 ```
+
+`jq -e` exits non-zero when its last output is `false`, so the pipeline fails exactly when files were skipped. To warn **without** failing, report the count and exit 0 deliberately:
+
+```bash
+skipped=$(safelint check . --all-files --format json | jq '.summary.files_skipped')
+[ "$skipped" -eq 0 ] || echo "warning: $skipped file(s) were not analysed"
+```
+
+Note that appending `|| echo ...` to the first form turns it into the second: `||` substitutes its own exit status, so the check can no longer fail the job.
 
 **SARIF does not carry these three fields.** SARIF has no natural home for run-level counts, and inventing a `properties` bag entry would be a safelint-specific extension no SARIF consumer reads. The parse failures themselves are present in SARIF as ordinary `SAFE000` results, so nothing is hidden; only the aggregate is JSON-only.
 
