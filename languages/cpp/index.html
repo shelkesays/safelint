@@ -920,6 +920,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#parse-coverage-the-preprocessor-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parse coverage: the preprocessor limit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#suppression-directives" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2374,6 +2385,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#parse-coverage-the-preprocessor-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parse coverage: the preprocessor limit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#suppression-directives" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2533,6 +2555,37 @@
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">              </span><span class="c1"># lint a directory</span>
 </code></pre></div>
 <p>The <code>tree-sitter-cpp</code> grammar ships as the opt-in <code>[cpp]</code> extra; the base install bundles no grammars.</p>
+<h2 id="parse-coverage-the-preprocessor-limit">Parse coverage: the preprocessor limit<a class="headerlink" href="#parse-coverage-the-preprocessor-limit" title="Permanent link">#</a></h2>
+<p><strong>Around half of a real C++ project's files may not be analysed at all.</strong> safelint parses the source as written; it does not run the preprocessor. C++ that a compiler accepts after <code>cpp</code> has run is therefore not always standalone-valid to the parser, the file surfaces a <code>SAFE000</code> parse error, and <strong>every other rule is skipped for it</strong>. A clean run on such a project is not the same as a clean project.</p>
+<p>Measured on stock defaults, counting every file in the project (including the <code>.h</code> headers that lint as C):</p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Files scanned</th>
+<th>Parse failures</th>
+<th>Share</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/fmtlib/fmt">fmt</a> <code>4afd0e4</code></td>
+<td>79</td>
+<td>43 (19 <code>.cc</code>, 24 <code>.h</code>)</td>
+<td><strong>54%</strong></td>
+</tr>
+<tr>
+<td><a href="https://github.com/google/leveldb">leveldb</a> <code>7ee830d</code></td>
+<td>133</td>
+<td>60 (13 <code>.cc</code>, 47 <code>.h</code>)</td>
+<td><strong>45%</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Headers fare worst, and for a header-only or header-heavy library that is most of the code: both projects above fail more headers than translation units. The two C projects measured alongside them come out lower (curl 25%, redis 42%), so C++ is the worse case, not the better one.</p>
+<p>The <code>.h</code> rows above assume <strong>both</strong> grammars are installed (<code>pip install 'safelint[c,cpp]'</code>). <code>.h</code> belongs to the C language definition, so a <code>safelint[cpp]</code>-only install does not read those headers at all: they are never discovered or parsed, and they contribute no <code>SAFE000</code>. What you get instead is a <code>pip install 'safelint[c]'</code> hint on stderr, so the effect is a smaller finding count on the same tree, not better coverage.</p>
+<p>Those headers also lint as <strong>C</strong>, per the header-ownership limitation above, so their parse errors carry the C <code>SAFE000</code> wording rather than the C++ one.</p>
+<p>The causes, the per-error-kind breakdown, and what you can do about it are on the <a href="../c/#parse-coverage-the-preprocessor-limit">C page</a>. They are <em>nearly</em> identical for both languages, with one C++-only addition: because <code>.h</code> is parsed as C, C++ syntax in such a header (a <code>namespace</code>, a <code>template</code>, a base-class list) defeats the C grammar on its own, and no amount of preprocessing changes that. Measured on fmt, it is the minority cause: re-running its 24 failing <code>.h</code> headers under the C++ grammar leaves 20 of them still failing on macro or directive shapes, and clears only 4. Renaming those headers to <code>.hpp</code> / <code>.hxx</code> / <code>.hh</code> is what recovers the 4. Tracked as <a href="https://github.com/shelkesays/safelint/issues/206">#206</a>.</p>
 <h2 id="suppression-directives">Suppression directives<a class="headerlink" href="#suppression-directives" title="Permanent link">#</a></h2>
 <p>C++ uses line-comment directives (<code>//</code> form): <code>// nosafe</code> (all rules on the line), <code>// nosafe: SAFE315</code> (a specific rule), and the file-scope <code>// safelint: ignore</code>. Block-comment (<code>/* */</code>) directives parse but are not recognised, matching every other language's line-directive-only convention.</p>
 <h2 id="rules-that-fire-on-c">Rules that fire on C++<a class="headerlink" href="#rules-that-fire-on-c" title="Permanent link">#</a></h2>

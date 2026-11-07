@@ -892,6 +892,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#parse-coverage-the-preprocessor-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parse coverage: the preprocessor limit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parse coverage: the preprocessor limit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-defeats-the-parser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What defeats the parser
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#working-with-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Working with it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#suppression-directives" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2385,6 +2424,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#parse-coverage-the-preprocessor-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parse coverage: the preprocessor limit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parse coverage: the preprocessor limit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-defeats-the-parser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What defeats the parser
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#working-with-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Working with it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#suppression-directives" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2555,6 +2633,81 @@
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">              </span><span class="c1"># lint a directory</span>
 </code></pre></div>
 <p>The <code>tree-sitter-c</code> grammar ships as the opt-in <code>[c]</code> extra; the base install bundles no grammars.</p>
+<h2 id="parse-coverage-the-preprocessor-limit">Parse coverage: the preprocessor limit<a class="headerlink" href="#parse-coverage-the-preprocessor-limit" title="Permanent link">#</a></h2>
+<p><strong>A quarter to a half of a real C or C++ project's files may not be analysed at all.</strong> safelint parses the source as written; it does not run the preprocessor. Ordinary C that a compiler accepts after <code>cpp</code> has run is therefore not always standalone-valid to the parser, the file surfaces a <code>SAFE000</code> parse error, and <strong>every other rule is skipped for it</strong>. A clean run on such a project is not the same as a clean project.</p>
+<p>Measured on stock defaults against four widely deployed codebases:</p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Language</th>
+<th>Files scanned</th>
+<th>Parse failures</th>
+<th>Share</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/curl/curl">curl</a> <code>61a31e0</code></td>
+<td>C</td>
+<td>1101</td>
+<td>277 (239 <code>.c</code>, 38 <code>.h</code>)</td>
+<td><strong>25%</strong></td>
+</tr>
+<tr>
+<td><a href="https://github.com/redis/redis">redis</a> <code>b540ca4</code></td>
+<td>C</td>
+<td>845</td>
+<td>351 (243 <code>.c</code>, 104 <code>.h</code>, 4 <code>.cpp</code>)</td>
+<td><strong>42%</strong></td>
+</tr>
+<tr>
+<td><a href="https://github.com/fmtlib/fmt">fmt</a> <code>4afd0e4</code></td>
+<td>C++</td>
+<td>79</td>
+<td>43 (19 <code>.cc</code>, 24 <code>.h</code>)</td>
+<td><strong>54%</strong></td>
+</tr>
+<tr>
+<td><a href="https://github.com/google/leveldb">leveldb</a> <code>7ee830d</code></td>
+<td>C++</td>
+<td>133</td>
+<td>60 (13 <code>.cc</code>, 47 <code>.h</code>)</td>
+<td><strong>45%</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Headers fare worst, which matters most for a header-heavy library: fmt's failures are more <code>.h</code> than <code>.cc</code>. The figures have been stable since 2.14.3 (identical counts), so they describe the approach rather than a regression in any one release.</p>
+<h3 id="what-defeats-the-parser">What defeats the parser<a class="headerlink" href="#what-defeats-the-parser" title="Permanent link">#</a></h3>
+<p>Nearly every cause is the preprocessor or a compiler extension, and the code is valid:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">// conditional compilation INSIDE an expression</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">if</span><span class="p">(</span><span class="n">ip</span><span class="o">-&gt;</span><span class="n">maskbits</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="cp">#ifdef AF_INET6</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">   </span><span class="p">(</span><span class="n">ip</span><span class="o">-&gt;</span><span class="n">family</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">AF_INET6</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">ip</span><span class="o">-&gt;</span><span class="n">maskbits</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">128</span><span class="p">)</span><span class="w"> </span><span class="o">||</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="cp">#endif</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">   </span><span class="n">ip</span><span class="o">-&gt;</span><span class="n">maskbits</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">32</span><span class="p">)</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1">// a function-like macro standing in for parameters</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">timer_cb</span><span class="p">(</span><span class="n">EV_P_</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">ev_timer</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">revents</span><span class="p">)</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="c1">// a guarded attribute before a declaration</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="cp">#if defined(__GNUC__) || defined(__clang__)</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="n">__attribute__</span><span class="p">((</span><span class="n">format</span><span class="p">(</span><span class="n">printf</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">)))</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="cp">#endif</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">mem_addf</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mem</span><span class="w"> </span><span class="o">*</span><span class="n">mem</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">format</span><span class="p">,</span><span class="w"> </span><span class="p">...)</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="c1">// a compiler builtin with non-C argument syntax</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="k">if</span><span class="p">(</span><span class="n">__builtin_available</span><span class="p">(</span><span class="n">macOS</span><span class="w"> </span><span class="mf">10.12</span><span class="p">,</span><span class="w"> </span><span class="n">iOS</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="p">))</span><span class="w"> </span><span class="p">{}</span>
+</code></pre></div>
+<p>There is a second, smaller cause that only affects <code>.h</code> headers in a <strong>C++</strong> project: <code>.h</code> lints as C (see the <a href="../cpp/#file-extensions">C++ page</a>), so C++ syntax in it defeats the C grammar no matter what the preprocessor does. Re-running fmt's 24 failing <code>.h</code> headers under the C++ grammar separates the two: 4 parse clean, so the C grammar alone was the problem; the other 20 still fail, so they are genuinely macro or directive shapes. Renaming to <code>.hpp</code> / <code>.hxx</code> / <code>.hh</code> therefore recovers that minority and nothing more.</p>
+<p>Because of this the <code>SAFE000</code> message on C and C++ names the preprocessor instead of telling you to check your syntax. The hint is per-language, not per-cause: safelint cannot distinguish "valid code the preprocessor would fix" from a genuine typo, so a real syntax error also reads as a possible preprocessor issue. By error kind, roughly three quarters of the failures are a bare <code>syntax error</code> and a fifth a <code>missing ';'</code> (the macro-as-declarator shape); redis also shows 14 <code>missing '#endif'</code>, the conditional-compilation shape proper.</p>
+<h3 id="working-with-it">Working with it<a class="headerlink" href="#working-with-it" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Count the <code>SAFE000</code> findings before trusting a clean report</strong>, and count them from a full scan: <code>safelint check . --all-files</code>, since without <code>--all-files</code> the run only covers git-modified files and its count says nothing about the project. They are 10-14% of all default findings on the projects above, so a run with no other violations may still have read only half the tree. A summary line for skipped files is tracked in <a href="https://github.com/shelkesays/safelint/issues/175">#175</a>.</li>
+<li><strong>Lint preprocessed output</strong> where a build can produce it (<code>cc -E</code>). Three things are lost, not just one: line numbers that map back to your source, every inactive branch (whatever the build's own <code>-D</code> flags excluded is simply not there), and the directives themselves, which silently retires the opt-in SAFE311 <code>complex_macro</code> and SAFE312 <code>conditional_compilation</code> rules because the nodes they match no longer exist.</li>
+<li><strong><code>ignore = ["SAFE000"]</code></strong> silences the parse errors if the noise outweighs the signal for you. It does not make the files analysable; it only hides the fact that they were skipped. Prefer leaving them visible.</li>
+</ul>
+<p>Tracked as <a href="https://github.com/shelkesays/safelint/issues/206">#206</a>, with a preprocessor-tolerant parse pass as the open question.</p>
 <h2 id="suppression-directives">Suppression directives<a class="headerlink" href="#suppression-directives" title="Permanent link">#</a></h2>
 <p>C uses line-comment directives (<code>//</code> form): <code>// nosafe</code> (all rules on the line), <code>// nosafe: SAFE106</code> (a specific rule), and the file-scope <code>// safelint: ignore</code>. Block-comment (<code>/* */</code>) directives parse but are not recognised, matching every other language's line-directive-only convention.</p>
 <h2 id="rules-that-fire-on-c">Rules that fire on C<a class="headerlink" href="#rules-that-fire-on-c" title="Permanent link">#</a></h2>
@@ -2748,65 +2901,65 @@
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h2>
 <p>Every C-specific config key is set in either form. <code>[tool.safelint.rules.&lt;name&gt;]</code> for <code>pyproject.toml</code>, <code>[rules.&lt;name&gt;]</code> for standalone <code>safelint.toml</code>.</p>
 <h3 id="enable-the-opt-in-c-rules">Enable the opt-in C rules<a class="headerlink" href="#enable-the-opt-in-c-rules" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">[tool.safelint.rules.dynamic_allocation]</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">[tool.safelint.rules.restricted_pointers]</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># safelint.toml</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">[rules.dynamic_allocation]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">[tool.safelint.rules.dynamic_allocation]</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">[rules.restricted_pointers]</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">[tool.safelint.rules.restricted_pointers]</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 </code></pre></div>
-<h3 id="safe106-non-local-jump-calls">SAFE106 non-local jump calls<a class="headerlink" href="#safe106-non-local-jump-calls" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">[tool.safelint.rules.nonlocal_jumps]</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">nonlocal_jump_calls_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;setjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;longjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sigsetjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;siglongjmp&quot;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># safelint.toml</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">[rules.dynamic_allocation]</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">[rules.restricted_pointers]</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># safelint.toml</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">[rules.nonlocal_jumps]</span>
+<h3 id="safe106-non-local-jump-calls">SAFE106 non-local jump calls<a class="headerlink" href="#safe106-non-local-jump-calls" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">[tool.safelint.rules.nonlocal_jumps]</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">nonlocal_jump_calls_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;setjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;longjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sigsetjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;siglongjmp&quot;</span><span class="p">]</span>
 </code></pre></div>
-<h3 id="safe310-allocation-calls">SAFE310 allocation calls<a class="headerlink" href="#safe310-allocation-calls" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">[tool.safelint.rules.dynamic_allocation]</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">allocation_calls_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;malloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;calloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;realloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;aligned_alloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;free&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strdup&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;xmalloc&quot;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># safelint.toml</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">[rules.nonlocal_jumps]</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">nonlocal_jump_calls_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;setjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;longjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sigsetjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;siglongjmp&quot;</span><span class="p">]</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># safelint.toml</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">[rules.dynamic_allocation]</span>
+<h3 id="safe310-allocation-calls">SAFE310 allocation calls<a class="headerlink" href="#safe310-allocation-calls" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">[tool.safelint.rules.dynamic_allocation]</span>
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">allocation_calls_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;malloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;calloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;realloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;aligned_alloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;free&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strdup&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;xmalloc&quot;</span><span class="p">]</span>
 </code></pre></div>
-<h3 id="safe801-taint-sinks-sources-sanitizers">SAFE801 taint sinks / sources / sanitizers<a class="headerlink" href="#safe801-taint-sinks-sources-sanitizers" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">[tool.safelint.rules.tainted_sink]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># safelint.toml</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">[rules.dynamic_allocation]</span>
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">sinks_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;system&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;popen&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execl&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execlp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execv&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execvp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sprintf&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strcpy&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strcat&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;gets&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;memcpy&quot;</span><span class="p">]</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">sources_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;getenv&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;fgets&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;gets&quot;</span><span class="p">]</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">sanitizers_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;sanitize&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;validate&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;escape&quot;</span><span class="p">]</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">allocation_calls_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;malloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;calloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;realloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;aligned_alloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;free&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strdup&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;xmalloc&quot;</span><span class="p">]</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># safelint.toml</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">[rules.tainted_sink]</span>
+<h3 id="safe801-taint-sinks-sources-sanitizers">SAFE801 taint sinks / sources / sanitizers<a class="headerlink" href="#safe801-taint-sinks-sources-sanitizers" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">[tool.safelint.rules.tainted_sink]</span>
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">sinks_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;system&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;popen&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execl&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execlp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execv&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execvp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sprintf&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strcpy&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strcat&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;gets&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;memcpy&quot;</span><span class="p">]</span>
 <a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">sources_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;getenv&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;fgets&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;gets&quot;</span><span class="p">]</span>
 <a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="n">sanitizers_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;sanitize&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;validate&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;escape&quot;</span><span class="p">]</span>
 </code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># safelint.toml</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">[rules.tainted_sink]</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">sinks_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;system&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;popen&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execl&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execlp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execv&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execvp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sprintf&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strcpy&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strcat&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;gets&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;memcpy&quot;</span><span class="p">]</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">sources_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;getenv&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;fgets&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;gets&quot;</span><span class="p">]</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">sanitizers_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;sanitize&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;validate&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;escape&quot;</span><span class="p">]</span>
+</code></pre></div>
 <p>Both lists above are <strong>universal</strong>: a name in <code>sanitizers_c</code> clears <em>every</em> sink. To recognise a
 context-specific escaper precisely - one that makes a value safe for a shell sink but not for a
 format-string sink - declare it with the opt-in <a href="../../configuration/rules/#property-typed-sanitisers-sanitizer_properties-sink_properties">property-typed sanitiser contract</a>
 instead (2.13.0):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># safelint.toml</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">[rules.tainted_sink.sanitizer_properties_c]</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">shell_quote</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;shell_quoted&quot;</span><span class="p">]</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="k">[rules.tainted_sink.sink_properties_c]</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">system</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shell_quoted&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># safelint.toml</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="k">[rules.tainted_sink.sanitizer_properties_c]</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">shell_quote</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;shell_quoted&quot;</span><span class="p">]</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="k">[rules.tainted_sink.sink_properties_c]</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="n">system</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shell_quoted&quot;</span>
 </code></pre></div>
 <p>A property-typed sanitiser clears <strong>only</strong> the sinks that declare a property it establishes, so
 <code>shell_quote</code> no longer silently vouches for <code>sprintf</code>. Keep the name out of the flat
