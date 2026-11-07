@@ -67,25 +67,16 @@ def _git(repo: Path, *args: str) -> None:
 @pytest.fixture()
 def repo(tmp_path: Path) -> Path:
     """A git repo whose committed CHANGELOG has two released sections."""
-    _git(tmp_path, "init", "-q")
+    # ``-b main`` pins the branch name: without it the repo inherits the host's
+    # ``init.defaultBranch``, and a setting such as ``trunk`` left the merge-base
+    # test checking out a branch that does not exist (#281 review).
+    _git(tmp_path, "init", "-q", "-b", "main")
     _git(tmp_path, "config", "user.email", "t@example.invalid")
     _git(tmp_path, "config", "user.name", "Test")
     (tmp_path / "CHANGELOG.md").write_text(_RELEASED, encoding="utf-8")
     _git(tmp_path, "add", "CHANGELOG.md")
     _git(tmp_path, "commit", "-qm", "base")
     return tmp_path
-
-
-def _has_branch(repo: Path, name: str) -> bool:
-    """True when *name* is a branch in *repo*."""
-    done = subprocess.run(["git", "rev-parse", "--verify", name], cwd=repo, capture_output=True, check=False)
-    return done.returncode == 0
-
-
-def _current_branch(repo: Path) -> str:
-    """Return *repo*'s current branch name."""
-    done = subprocess.run(["git", "branch", "--show-current"], cwd=repo, capture_output=True, text=True, check=True)
-    return done.stdout.strip()
 
 
 def _run(script: ModuleType, repo: Path, base: str = "HEAD") -> int:
@@ -245,13 +236,12 @@ def test_a_release_landing_on_the_base_does_not_fail_a_valid_branch(repo: Path) 
     _git(repo, "commit", "-qam", "feature work")
 
     # meanwhile a release dates [Unreleased] on the base branch
-    _git(repo, "checkout", "-q", "master" if _has_branch(repo, "master") else "main")
+    _git(repo, "checkout", "-q", "main")
     path.write_text(_RELEASED.replace("## [Unreleased]", "## [Unreleased]\n\n## [2.19.0] - 2026-12-01\n\n### Added\n\n- **Released since.**", 1), encoding="utf-8")
     _git(repo, "commit", "-qam", "release 2.19.0")
-    base = _current_branch(repo)
     _git(repo, "checkout", "-q", "feature")
 
-    assert _run(_load_script(), repo, base=base) == 0
+    assert _run(_load_script(), repo, base="main") == 0
 
 
 def test_a_duplicate_release_heading_is_refused(repo: Path) -> None:
@@ -289,13 +279,16 @@ def test_the_duplicate_message_names_the_version(repo: Path, capsys: pytest.Capt
 def test_an_undecodable_base_blob_cannot_tell_rather_than_crashing(repo: Path) -> None:
     """``text=True`` decoded and raised; the contract promises exit 2 or a verdict.
 
-    The base is read with a replacement decode now, so an invalid blob yields a
-    comparison rather than a traceback. Either outcome is acceptable here - what
-    is not is an unhandled ``UnicodeDecodeError`` escaping the checker.
+    Strictly exit 2, not "either outcome". An earlier fix decoded with
+    ``errors="replace"``, which was worse than the crash it removed: every
+    invalid byte becomes the same U+FFFD, so two *different* undecodable bytes
+    compared equal and an edit between them slipped through (#281 review).
+    Refusing to guess is the honest answer, and the third exit state exists so
+    it does not have to be forced into a pass or a fail.
     """
     path = repo / "CHANGELOG.md"
     path.write_bytes(_RELEASED.encode() + b"\xff\xfe")
     _git(repo, "commit", "-qam", "undecodable base")
     path.write_text(_RELEASED, encoding="utf-8")
 
-    assert _run(_load_script(), repo) in (0, 1)
+    assert _run(_load_script(), repo) == 2
