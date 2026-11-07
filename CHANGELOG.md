@@ -38,13 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   **Bundled skill content changed: run `safelint skill install --force`.** All 14 client files gained the new summary keys and, more importantly, an instruction not to report a clean run without checking `files_skipped` first. Their example headline `Clean run: 12 files checked, no violations.` was itself the false-clean claim this issue is about, and now reads `files analysed` with a second variant for when files were skipped.
 
-## [2.17.2] - 2026-11-07
-
 ### Changed
 
 - **CI now runs the test suite on Windows.** One `windows-latest` job on Python 3.12 alongside the four Ubuntu jobs. Coverage stays enforced on the Ubuntu jobs only: a handful of tests are legitimately skipped on Windows (a filename carrying a control character cannot exist there, and the validation-harness fixtures are `#!/bin/sh` scripts Windows cannot execute), so their lines never run and the percentage is structurally lower. Enforcing the same 97% threshold on both would force a choice between deleting honest skips and lowering the gate for everyone; the job is there to catch platform behaviour, which it does either way. safelint is full of path handling (test-dir membership, changed-set matching, symlink containment, drive letters) and an Ubuntu-only matrix structurally cannot see a bug in any of it, which is why #265 sat unreproducible. One Windows job rather than four: these bugs are platform-dependent, not Python-version-dependent, so a second Windows interpreter would mostly re-run the same assertions at twice the cost.
-
-- **CI: bump `anthropics/claude-code-action` v1.0.264 -> v1.0.269** (folded in from Dependabot PR #267, which asked for v1.0.267; taken to the current latest so the next Dependabot round has nothing to raise). Still SHA-pinned. The SHA was verified against its **dereferenced** tag object, since these tags are annotated and the naive ref lookup returns the tag object rather than the commit: `refs/tags/v1.0.269` dereferences to commit `61a9c27`. The five upstream commits in the range touch only the bundled Claude Code / Agent SDK version (2.1.312 -> 2.1.319) plus lockfiles; no action input was added, renamed or removed, so `anthropic_api_key`, `prompt` and `claude_args` in `claude-review.yml` are unaffected. Workflow only - nothing in the published wheel changes.
 
 ### Fixed
 
@@ -57,6 +53,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A changed-file set safelint cannot match now warns instead of reading as "nothing changed" (#265).** SAFE702 answers "did this file change?" by canonical-path equality. When the caller's spelling differs from the files being linted, the comparison finds nothing and the rule skips every file, which is indistinguishable from a clean run. That is the reported symptom: the same commit passed locally on Windows and failed SAFE702 on Linux CI for five branches running.
 
   The trigger is deliberately "**none** of the changed paths exist" rather than "any is missing", because a commit that deletes files legitimately carries paths that are gone and warning per entry would be noise. One `safelint: warning:` line on stderr, never a failed run, per the project's typo-guard convention. The message names the likely cause: a drive-less rooted path is what Git Bash hands a wrapper on Windows, and Python there reports `is_absolute() == False` for it, so `resolve()` anchors it under the current drive *and directory* and it can never match the walker's path. The underlying comparison is unchanged; loosening it would trade a silent false negative for a silent false positive.
+
+## [2.17.2] - 2026-11-07
+
+### Changed
+
+- **CI: bump `anthropics/claude-code-action` v1.0.264 -> v1.0.269** (folded in from Dependabot PR #267, which asked for v1.0.267; taken to the current latest so the next Dependabot round has nothing to raise). Still SHA-pinned. The SHA was verified against its **dereferenced** tag object, since these tags are annotated and the naive ref lookup returns the tag object rather than the commit: `refs/tags/v1.0.269` dereferences to commit `61a9c27`. The five upstream commits in the range touch only the bundled Claude Code / Agent SDK version (2.1.312 -> 2.1.319) plus lockfiles; no action input was added, renamed or removed, so `anthropic_api_key`, `prompt` and `claude_args` in `claude-review.yml` are unaffected. Workflow only - nothing in the published wheel changes.
+
+### Fixed
 
 - **SAFE000 on C and C++ no longer blames the user for valid code (#206).** `Parse error (syntax error) at line 135, column 4 - check syntax near this location` was wrong on both counts: the syntax is fine and there is nothing at that location to check. safelint parses the source as written and never runs the preprocessor, so ordinary C that a compiler accepts once `cpp` has run is not standalone-valid to the parser:
 
