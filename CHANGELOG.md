@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   `scripts/check_changelog_history.py` now asserts that every dated section present in **both** the base branch and the head is byte-identical, including the compare-link footers (those were corrupted once by the same mechanism). Adding a *new* dated section stays allowed, because that is what the release workflow does, and `[Unreleased]` stays freely editable. It runs as a `CHANGELOG history` job on pull requests only, since a push has no base to compare against.
 
-  Three exit states rather than two, deliberately: 0 intact, 1 a released section was edited, and **2 "could not tell"** (an unreadable base ref). Collapsing the third into 0 would let a misconfigured job silently stop guarding, which is the exact failure mode the check exists to remove.
+  A **deleted or renamed** dated heading counts too, not only an edited one. The first implementation compared only versions present in both files, so removing a released section and its notes was never looked at and passed - and a deletion is strictly worse than an edit, since an edit at least leaves something to compare (caught in review on #279).
+
+  Three exit states rather than two, deliberately: 0 intact, 1 a released section was edited or lost, and **2 "could not tell"** (an unreadable base ref, a missing or undecodable file). Collapsing the third into 0 would let a misconfigured job silently stop guarding, which is the exact failure mode the check exists to remove; raising a traceback instead would be nearly as bad, since either way CI stops reporting what it was added for.
 
 ### Fixed
 
