@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`sync-development` can no longer deadlock silently (#277).** After the 2.18.0 release the workflow refused to reset `development` and **reported success**, so the branches sat diverged for a whole release cycle with the only trace a workflow annotation. `development` kept the prerelease version and lacked seven fixes that were on `main`; merging further work into it and cutting the next release from it would have regressed them.
+
+  Worse, both remedies its own error message named were already satisfied. "Land that work on main" - it had landed, as a rebase, so the SHAs differed and the guard could not see them. "Dispatch this workflow" - dispatching ran the identical job with the identical guard, and the workflow declared no `inputs`, so there was nothing to override. It took a manual archive plus a force-push past branch protection.
+
+  Three changes, the first two of which are this release:
+
+  - **A refusal now fails the job.** It exited 0, which in the Actions list is indistinguishable from a sync that worked. A refusal always needs a human to act, so it is actionable by definition and belongs red.
+  - **`workflow_dispatch` gained a `force` input**, which is the escape hatch the refusal message had been promising all along. It still archives `development`'s tip to `archive/development-<sha>` before resetting, so it stays recoverable.
+  - **The refusal message now says what actually works**, and points at `git cherry origin/main origin/development` for deciding whether `force` is safe: every line prefixed `-` means that patch is already upstream, which is exactly how this instance was confirmed lossless before anyone touched it.
+
+  Left for a decision rather than built: proving equivalence by content so the workflow resets itself. `git cherry` answered correctly here, but the workflow's own comments record that patch-id was tried and rejected during the 2.15.0 release, so reversing that is a design call rather than a fix. Noted on #277.
+
 - **CI refuses a change that edits the notes of an already-released version (#278).** Rebasing a feature branch across a release silently rewrites published release notes, and it **never conflicts**, so nothing asks. A branch's entries sit under `## [Unreleased]` -> `### Fixed`; the release workflow renames that heading to `## [X.Y.Z] - <date>` and inserts a fresh empty `[Unreleased]`; a later rebase sees `### Fixed` either side with identical surrounding context and merges the entries into the **dated** section.
 
   That happened four times in a single day - on the branches for #266, #270, #275 and #276 - and every instance was caught only by diffing the dated sections by hand afterwards. Nothing in the gate could see it: the rebase reported success, the suite passed, and `mkdocs build --strict` passed. Had one merged, a tagged release on PyPI would have grown notes describing work it did not contain.
