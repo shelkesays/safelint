@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Added as a "Parse coverage" section on `docs/languages/c.md` and `cpp.md` (causes, per-error-kind breakdown, and what to do about it), a note under SAFE000 in `docs/configuration/rules.md`, and a block in the bundled C and C++ skill addenda telling an agent not to read a clean run as a clean project and not to rewrite working code to satisfy the parser. **Bundled skill content changed: run `safelint skill install --force`.**
 
+  The preprocessor is not the whole story, and the docs now say so. A `.h` header in a **C++** project lints as C, so C++ syntax in it defeats the C grammar on its own, whatever the preprocessor would have done. Measuring the split: re-running fmt's 24 failing `.h` headers under the C++ grammar clears 4 and leaves 20 still failing, so the grammar mismatch is a real but minority cause, and renaming to `.hpp` / `.hxx` / `.hh` recovers only those 4. Two further caveats were wrong by omission: the coverage count is only meaningful from `safelint check . --all-files` (a bare run covers git-modified files alone), and linting `cc -E` output costs more than line numbers, since it drops every inactive branch and removes the directives that the opt-in SAFE311 and SAFE312 rules match, retiring both rules silently. The `.h` figures also assume `safelint[c,cpp]`; a `cpp`-only install never reads those headers.
+
   Not addressed here: the summary still gives no skipped-file count (#175), and a preprocessor-tolerant parse pass (item 4 of #206) remains open.
 
 ## [2.17.1] - 2026-11-07
