@@ -126,18 +126,31 @@ def primitive_macro_parse_cause(root: tree_sitter.Node) -> str | None:
     is nothing here to fix". Verified against both forms of the failure and
     against a stray-brace and missing-semicolon error.
 
+    **Every** error in the file has to be this shape, not merely one of them.
+    Returning the advice on a first match was wrong in both directions
+    (reported on #275): with a genuine error earlier in the file, ``SAFE000``
+    points at THAT line while the message says there is nothing to fix; with
+    the macro first, the message is right about its own location but still
+    tells the reader a broken file is fine. Saying "nothing here to fix" is
+    only honest when nothing else is broken, so any other error - including a
+    MISSING token, which carries no text - falls back to the generic advice.
+
     Prunes subtrees with no error, so a mostly-valid file costs one shallow
     walk rather than a full traversal.
     """
     stack = [root]
+    found = False
     while len(stack) > 0:
         node = stack.pop()
         if not node.has_error:
             continue
-        if node.type == ERROR and _is_primitive_macro_error(node):
-            return _PRIMITIVE_MACRO_ADVICE
-        stack.extend(node.children)
-    return None
+        if not (node.is_missing or node.type == ERROR):
+            stack.extend(node.children)
+            continue
+        if not _is_primitive_macro_error(node):
+            return None
+        found = True
+    return _PRIMITIVE_MACRO_ADVICE if found else None
 
 
 def _is_primitive_macro_error(node: tree_sitter.Node) -> bool:

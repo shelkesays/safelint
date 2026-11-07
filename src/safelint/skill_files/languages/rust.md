@@ -46,7 +46,7 @@ When acting on a report:
 
 - **Do not rewrite the source to satisfy the parser.** The code is valid Rust; the limitation is upstream in the grammar (still present in tree-sitter-rust 0.24.2, the latest release). The `SAFE000` message says so for this shape rather than telling you to check syntax.
 - **Check the `SAFE000` count before calling a Rust project clean.** A silently skipped file looks identical to a clean one. On ruff, 3 skipped files sat among 6,066 findings.
-- A genuine Rust syntax error still reads as "check syntax near this location", so the two are distinguishable from the message alone.
+- A genuine Rust syntax error still reads as "check syntax near this location", so the two are distinguishable from the message alone. The cause-specific wording appears only when **every** parse error in the file is this shape: a file with a real syntax error as well falls back to the generic advice, because "nothing here to fix" would be false there.
 
 Tracked as issue #174.
 
