@@ -76,6 +76,23 @@ def _dated_sections(text: str) -> dict[str, str]:
     return sections
 
 
+def _duplicate_versions(text: str) -> list[str]:
+    """Return versions whose dated heading appears more than once.
+
+    A repeated heading collapses in :func:`_dated_sections`'s dict and the LAST
+    copy wins, so an edit to the first copy hides behind an untouched duplicate
+    and the comparison passes (#280 review). A changelog has no legitimate
+    duplicate release heading, so the caller refuses one outright rather than
+    trying to compare both.
+
+    Its own function rather than tracked inside the section walk, which
+    safelint's own SAFE104 flagged at cyclomatic complexity 11 against a max
+    of 10.
+    """
+    versions = [match.group("version") for line in text.split("\n") if (match := _DATED_HEADING.match(line)) is not None]
+    return sorted({version for version in versions if versions.count(version) > 1})
+
+
 def _footer_links(text: str) -> dict[str, str]:
     """Return ``{version: footer line}`` for each compare-link definition."""
     links: dict[str, str] = {}
@@ -86,13 +103,40 @@ def _footer_links(text: str) -> dict[str, str]:
     return links
 
 
-def _git_show(ref: str, path: str) -> str | None:
-    """Return *path* as of *ref*, or None when it cannot be read."""
+def _git(*args: str) -> str | None:
+    """Run a read-only git command and return stdout, or None on any failure.
+
+    ``text=True`` decodes, so an invalid blob raises ``UnicodeDecodeError``
+    rather than returning - which escaped the caller and crashed instead of
+    reporting the documented "cannot tell" status (#280 review). Decoded here
+    with a replacement policy instead: a changelog that cannot be decoded
+    cleanly is still worth comparing, and a crash tells nobody anything.
+    """
     try:
-        done = subprocess.run(["git", "show", f"{ref}:{path}"], capture_output=True, text=True, check=False)  # noqa: S603, S607 - argv list, no shell; git from PATH as elsewhere in scripts/
+        done = subprocess.run(["git", *args], capture_output=True, check=False)  # noqa: S603, S607 - argv list, no shell; git from PATH as elsewhere in scripts/
     except OSError:
         return None
-    return done.stdout if done.returncode == 0 else None
+    if done.returncode != 0:
+        return None
+    return done.stdout.decode("utf-8", errors="replace")
+
+
+def _comparison_ref(base_ref: str) -> str | None:
+    """Return the merge base of *base_ref* and HEAD, else None.
+
+    Comparing against the base **tip** fails valid pull requests. When a
+    release lands on the base while a branch is open, the base gains a dated
+    section the branch has never seen, and the deleted-section check reports
+    the branch as having *lost published notes* - which is both wrong and
+    actively misleading, since the branch is merely out of date (#280 review).
+
+    The merge base is the right reference: it is the newest state the branch
+    actually diverged from, so a release landing afterwards is irrelevant,
+    while any edit to a section that existed at the branch point is still
+    caught.
+    """
+    merge_base = _git("merge-base", base_ref, "HEAD")
+    return merge_base.strip() if merge_base is not None and merge_base.strip() else None
 
 
 class _Verdict(NamedTuple):
@@ -120,12 +164,13 @@ def _compare(base_text: str, head_text: str) -> _Verdict:
     # renamed, which loses the notes outright rather than editing them - worse
     # than what this check was written for, and it passed, because comparing
     # only the shared versions never looked at it (#279 review).
-    missing = sorted(set(base_sections) - set(head_sections))
-    shared = sorted(set(base_sections) & set(head_sections))
+    base_versions, head_versions = set(base_sections), set(head_sections)
+    missing = sorted(base_versions - head_versions)
+    shared = sorted(base_versions & head_versions)
     changed = [v for v in shared if base_sections[v] != head_sections[v]]
 
     base_links, head_links = _footer_links(base_text), _footer_links(head_text)
-    shared_links = sorted(set(base_links) & set(head_links) & set(base_sections))
+    shared_links = sorted(set(base_links) & set(head_links) & base_versions)
     changed_links = [v for v in shared_links if base_links[v] != head_links[v]]
     return _Verdict(shared=len(shared), missing=missing, changed=changed, changed_links=changed_links)
 
@@ -168,10 +213,21 @@ def main(argv: list[str] | None = None) -> int:
     if head_text is None:
         print(f"cannot tell: could not read {args.changelog} from the working tree", file=sys.stderr)
         return _EXIT_CANNOT_TELL
-    base_text = _git_show(args.base_ref, args.changelog)
-    if base_text is None:
-        print(f"cannot tell: could not read {args.changelog} at {args.base_ref}", file=sys.stderr)
+    ref = _comparison_ref(args.base_ref)
+    if ref is None:
+        print(f"cannot tell: no merge base between {args.base_ref} and HEAD", file=sys.stderr)
         return _EXIT_CANNOT_TELL
+    base_text = _git("show", f"{ref}:{args.changelog}")
+    if base_text is None:
+        print(f"cannot tell: could not read {args.changelog} at {ref[:12]} (merge base with {args.base_ref})", file=sys.stderr)
+        return _EXIT_CANNOT_TELL
+
+    duplicated = _duplicate_versions(head_text)
+    if duplicated:
+        print(f"\nCHANGELOG has a duplicate release heading for: {', '.join(duplicated)}", file=sys.stderr)
+        print("A duplicate hides an edit to the earlier copy from this comparison, so it is", file=sys.stderr)
+        print("refused outright. Remove the repeated '## [X.Y.Z] - <date>' heading.", file=sys.stderr)
+        return _EXIT_EDITED
 
     verdict = _compare(base_text, head_text)
     if not verdict.has_findings:
