@@ -558,6 +558,33 @@ def _go_mutation_base_name(node: tree_sitter.Node) -> str | None:
     return None  # pragma: no cover - defensive: a pathologically nested target
 
 
+#: Go builtins that mutate a container passed as their FIRST argument, without
+#: any assignment, increment or address-of to give them away. A package-level
+#: map emptied by ``delete(cache, k)`` is shared mutable state every bit as much
+#: as one reassigned, and before #276's review it was silently unreported.
+#:
+#: ``copy`` writes into its destination; ``delete`` and ``clear`` both take the
+#: container first (``clear`` is Go 1.21+). Deliberately only the builtins: an
+#: arbitrary function that writes through a slice or map argument cannot be
+#: recognised without interprocedural analysis, which safelint does not do
+#: anywhere, and that limit is documented on the language page.
+_GO_MUTATING_BUILTINS: frozenset[str] = frozenset({"delete", "clear", "copy"})
+
+
+def _go_builtin_mutation_target(node: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the first argument of a mutating builtin call, else None."""
+    if node.type != _go.CALL_EXPRESSION:
+        return None
+    function = node.child_by_field_name("function")
+    if function is None or function.type != _go.IDENTIFIER or node_text(function) not in _GO_MUTATING_BUILTINS:
+        return None
+    arguments = node.child_by_field_name("arguments")
+    if arguments is None:
+        return None
+    named = arguments.named_children
+    return named[0] if len(named) > 0 else None
+
+
 def _go_mutated_names(root: tree_sitter.Node) -> set[str]:
     """Return every name mutated anywhere in the file.
 
@@ -567,6 +594,10 @@ def _go_mutated_names(root: tree_sitter.Node) -> set[str]:
     * ``x++`` / ``x--`` - ``inc_statement`` / ``dec_statement``;
     * ``&x`` - ``unary_expression``, which hands mutation rights to whoever
       receives the pointer, so it has to count even though no write is visible.
+    * ``delete(m, k)`` / ``clear(m)`` / ``copy(dst, src)`` - the mutating
+      builtins, which rebind nothing and so appear in none of the shapes above.
+      A package-level map emptied by ``delete`` is shared mutable state just as
+      much as one reassigned.
 
     Deliberately NOT scope-aware. A function-local ``x := 1; x = 2`` adds ``x``
     here even when the package-level ``x`` is untouched, so such a var still
@@ -585,6 +616,8 @@ def _go_mutated_names(root: tree_sitter.Node) -> set[str]:
         elif node.type == _go.UNARY_EXPRESSION and node_text(node).startswith("&"):
             operand = node.child_by_field_name("operand")
             targets = [operand] if operand is not None else []
+        elif (builtin_target := _go_builtin_mutation_target(node)) is not None:
+            targets = [builtin_target]
         else:
             continue
         mutated.update(name for name in (_go_mutation_base_name(target) for target in targets) if name is not None)
