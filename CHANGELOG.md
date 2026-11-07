@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.17.2] - 2026-11-07
+
 ### Changed
 
 - **CI: bump `anthropics/claude-code-action` v1.0.264 -> v1.0.269** (folded in from Dependabot PR #267, which asked for v1.0.267; taken to the current latest so the next Dependabot round has nothing to raise). Still SHA-pinned. The SHA was verified against its **dereferenced** tag object, since these tags are annotated and the naive ref lookup returns the tag object rather than the commit: `refs/tags/v1.0.269` dereferences to commit `61a9c27`. The five upstream commits in the range touch only the bundled Claude Code / Agent SDK version (2.1.312 -> 2.1.319) plus lockfiles; no action input was added, renamed or removed, so `anthropic_api_key`, `prompt` and `claude_args` in `claude-review.yml` are unaffected. Workflow only - nothing in the published wheel changes.
@@ -1718,7 +1720,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.17.1...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.17.2...HEAD
+[2.17.2]: https://github.com/shelkesays/safelint/compare/v2.17.1...v2.17.2
 [2.17.1]: https://github.com/shelkesays/safelint/compare/v2.17.0...v2.17.1
 [2.17.0]: https://github.com/shelkesays/safelint/compare/v2.16.0...v2.17.0
 [2.16.0]: https://github.com/shelkesays/safelint/compare/v2.15.0...v2.16.0
