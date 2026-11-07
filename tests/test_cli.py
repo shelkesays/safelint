@@ -27,14 +27,18 @@ from safelint.cli import (
     _make_skipped_line,
     _make_summary,
     _matching_suffixes,
+    _print_results,
     _print_summary,
     _print_violations,
+    _PrintOptions,
     _resolve_check_targets,
     _run_hook,
+    _RunCounts,
     _scan_for_unavailable_extensions,
     _visible,
 )
 from safelint.core.engine import LintResult
+from safelint.formatters import RunCoverage
 from safelint.languages import extra_name_for
 from safelint.rules.base import Violation
 
@@ -197,6 +201,44 @@ def test_no_skipped_line_when_nothing_was_skipped(capsys: pytest.CaptureFixture[
     _print_summary([], 0, "error", [])
 
     assert "NOT analysed" not in capsys.readouterr().out
+
+
+def test_hook_mode_still_reports_lost_coverage_on_a_clean_run(capsys: pytest.CaptureFixture[str]) -> None:
+    """CodeAnt finding on #269: ``silent_on_clean`` was hiding the skipped count.
+
+    A hook / stdin run with ``ignore = ["SAFE000"]`` produces no violations, so
+    the summary branch never fires. Staying silent there would hide lost
+    coverage at the gate that lets the commit through, which is the single most
+    consequential place for it.
+    """
+    _print_results(
+        "pretty",
+        [],
+        [],
+        blocking_count=0,
+        fail_on="error",
+        counts=_RunCounts(files_checked=3, coverage=RunCoverage(files_skipped=2)),
+        options=_PrintOptions(silent_on_clean=True),
+    )
+
+    out = _strip(capsys.readouterr().out)
+    assert out.strip() == "2 files could not be parsed and were NOT analysed."
+    assert "All checks passed." not in out  # the #50 silence contract is otherwise intact
+
+
+def test_hook_mode_stays_fully_silent_when_nothing_was_skipped(capsys: pytest.CaptureFixture[str]) -> None:
+    """The issue #50 contract: a clean pre-commit batch prints nothing at all."""
+    _print_results(
+        "pretty",
+        [],
+        [],
+        blocking_count=0,
+        fail_on="error",
+        counts=_RunCounts(files_checked=3),
+        options=_PrintOptions(silent_on_clean=True),
+    )
+
+    assert capsys.readouterr().out == ""
 
 
 # ---------------------------------------------------------------------------
