@@ -344,6 +344,30 @@ def _symlink_escapes(path: Path, root_real: Path) -> bool:
 _IS_WINDOWS = os.name == "nt"
 
 
+def _parse_error_advice(root: tree_sitter.Node, lang: LanguageDefinition) -> str:
+    """Return the trailing advice for a ``SAFE000`` message, most specific first.
+
+    Three tiers, deliberately ordered:
+
+    1. ``parse_error_cause`` - the language recognised THIS failure. Rust uses
+       it for a macro named after a primitive type, which the grammar cannot
+       parse at all (#174), so "check syntax" would send the reader debugging
+       correct code.
+    2. ``parse_error_hint`` - the language's unconditional wording, for one
+       where a parse failure is routinely not the user's mistake. C and C++ use
+       it because safelint never runs the preprocessor (#206).
+    3. The generic advice, which is right wherever a parse error really does
+       mean broken source.
+    """
+    if lang.parse_error_cause is not None:
+        cause = lang.parse_error_cause(root)
+        if cause is not None:
+            return cause
+    if lang.parse_error_hint is not None:
+        return lang.parse_error_hint
+    return "check syntax near this location"
+
+
 def _normalise_exclude_pattern(pattern: str) -> str:
     r"""Return *pattern* with Windows separators folded to ``/`` **on Windows only**.
 
@@ -949,7 +973,7 @@ class SafetyEngine:
         if location is None:  # pragma: no cover
             return self._parse_error_result(filepath, "Parse error: tree-sitter could not fully parse this file", lineno=0, column=None)
         line, col, kind = location
-        advice = lang.parse_error_hint if lang.parse_error_hint is not None else "check syntax near this location"
+        advice = _parse_error_advice(root, lang)
         msg = f"Parse error ({kind}) at line {line}, column {col + 1} - {advice}"
         return self._parse_error_result(filepath, msg, lineno=line, column=col + 1)
 
