@@ -1086,6 +1086,14 @@ _HOIST_SCOPE_ROOTS = _js.FUNCTION_TYPES | frozenset({_js.PROGRAM, _js.CLASS_STAT
 
 _LOOP_TYPES = frozenset({_js.FOR_STATEMENT, _js.FOR_IN_STATEMENT, _js.WHILE_STATEMENT, _js.DO_STATEMENT})
 
+# The clause kinds inside a ``switch_body``. NOT lexical scopes - that is why
+# they are absent from ``_BLOCK_SCOPE_TYPES`` - but they are the units a switch
+# can be ENTERED at, which is what makes a cross-clause read a hazard (#255).
+# ``switch_default`` is a distinct node type rather than a case with no value,
+# so listing only ``switch_case`` would quietly exclude ``default:``.
+_SWITCH_CLAUSE_TYPES = frozenset({_js.SWITCH_CASE, _js.SWITCH_DEFAULT})
+_SWITCH_BODY_TYPES = frozenset({_js.SWITCH_BODY})
+
 # Identifier-bearing nodes inside a binding pattern. `var {a, b} = o` binds
 # through SHORTHAND_PROPERTY_IDENTIFIER_PATTERN; later reads of `a` are plain
 # identifiers, so names are compared by text rather than by node identity.
@@ -1307,6 +1315,47 @@ def _escapes_block(references: list[tree_sitter.Node], block: tree_sitter.Node |
     if block is None:
         return False
     return any(ref.start_byte < block.start_byte or ref.end_byte > block.end_byte for ref in references)
+
+
+def _read_after_its_switch_clause(references: list[tree_sitter.Node], declaration: tree_sitter.Node, root: tree_sitter.Node) -> bool:
+    """Return True when a ``var`` declared in one switch clause is read from a later one.
+
+    The fifth shape (#255), and the one the other four each miss for a different
+    reason. It is not an escape: a case clause is not a lexical scope, so both
+    sites are inside the one scope the switch's braces open. It is not a
+    read-before-declaration either, because that compares SOURCE order and the
+    declaration comes first. What makes it a hazard is EXECUTION order - a
+    switch can be entered at any of its clauses, so reaching the read without
+    having run the declaration is the ordinary path, not a corner case:
+
+    .. code-block:: javascript
+
+        switch (k) {
+          case 1: var w = 1; break;
+          case 2: use(w); break;   // k === 2 never ran case 1
+        }
+
+    As ``var`` that reads ``undefined``; as ``let`` it throws ``Cannot access
+    'w' before initialization``, so the declaration genuinely blocks the
+    conversion.
+
+    No fall-through analysis is needed and none would help. A clause carrying a
+    label is directly reachable whenever the discriminant matches it, so the
+    hazard holds whether or not the declaring clause ends in ``break``; and the
+    discriminant's value is exactly what a linter cannot know.
+
+    A read inside the declaring clause, or in an EARLIER one, is not this shape:
+    the earlier case is already reported as a read before the declaration.
+    """
+    clause = _enclosing_below(declaration, _SWITCH_CLAUSE_TYPES, root)
+    if clause is None:
+        return False
+    body = _enclosing_below(declaration, _SWITCH_BODY_TYPES, root)
+    if body is None:
+        return False
+    # Bounded by the switch body on the right so a read further down the
+    # function is left to the escape check, which describes it better.
+    return any(clause.end_byte <= ref.start_byte <= body.end_byte for ref in references)
 
 
 def _read_before_declaration(references: list[tree_sitter.Node], declaration: tree_sitter.Node, root: tree_sitter.Node) -> bool:
@@ -1560,11 +1609,16 @@ class WideScopeDeclarationRule(BaseRule):
     # would instead bind a separate shadowing variable, so the two `var`s stop
     # being one binding. Different hazard, same fix, hence one message.
     _REBOUND = "`var` re-declares a name already bound in an overlapping scope (an earlier `var`, or a parameter) - `let` / `const` would reject or shadow it; rename one of them"
+    _CROSS_CASE = (
+        "`var` declared in one `switch` clause is read from a later one - entering the switch "
+        "there skips the declaration, so `var` reads `undefined` while `let` / `const` throw; "
+        "declare it above the `switch`"
+    )
 
     def _observable_hazard(self, declaration: tree_sitter.Node, index: _ScopeIndex) -> str | None:
         """Return the message for the hazard *declaration* exhibits, or None if it has none.
 
-        Order matters only for which message is shown; any one of the four is
+        Order matters only for which message is shown; any one of the five is
         enough to report.
         """
         root = _hoist_scope_root(declaration)
@@ -1590,6 +1644,9 @@ class WideScopeDeclarationRule(BaseRule):
             (_read_before_declaration(references, declaration, root), self._READ_BEFORE),
             (_captured_in_loop(references, _enclosing_below(declaration, _LOOP_TYPES, root)), self._LOOP_CAPTURE),
             (_escapes_block(references, _enclosing_below(declaration, _BLOCK_SCOPE_TYPES, root)), self._ESCAPES_BLOCK),
+            # Last, so a read that ALSO leaves the switch gets the escape
+            # wording, which is the more useful of the two for that code.
+            (_read_after_its_switch_clause(references, declaration, root), self._CROSS_CASE),
         )
         return next((message for observable, message in hazards if observable), None)
 

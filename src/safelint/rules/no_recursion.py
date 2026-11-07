@@ -39,7 +39,13 @@ from safelint.languages import php as _php
 from safelint.languages import python as _py
 from safelint.languages import rust as _rust
 from safelint.languages import typescript as _ts
-from safelint.languages._node_utils import function_name_node, node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import (
+    function_name_node,
+    lexical_binding_name,
+    node_text,
+    resolve_lang_name,
+    walk,
+)
 from safelint.rules.base import BaseRule, Suggestion
 
 
@@ -690,7 +696,56 @@ def _rust_path_tail(node: tree_sitter.Node | None) -> str | None:
     return None
 
 
-def _directly_nested_function_names(func: tree_sitter.Node, func_types: frozenset[str]) -> set[str]:
+#: Languages where a function expression takes its name from the binding that
+#: holds it, so ``function_name_node`` answering None does not mean the function
+#: is nameless. JS and TS declare most functions this way
+#: (``const walk = (n) => ...``), which is why SAFE105 was silent on the
+#: ecosystem's dominant form (#259). Every other language either names its
+#: functions on the node or has no such binding form, and is left alone.
+_BINDING_NAMED_LANGS: frozenset[str] = frozenset({_js.EXTRA_NAME, _ts.EXTRA_NAME})
+
+
+def _binding_name(func: tree_sitter.Node, lang: str) -> str | None:
+    """Return the bare name *func* is callable by in its own scope, or None.
+
+    :func:`lexical_binding_name`, not ``function_display_name``: the display
+    resolver also names an object-literal entry and a class field, and neither
+    is reachable by bare name, so drawing a recursion verdict from either
+    reports a call that raises ``ReferenceError`` rather than recursing. It
+    also rejects a key that is not statically spelled, so no verdict rests on
+    a variable whose value is unknown.
+
+    Restricted to :data:`_BINDING_NAMED_LANGS`. Java's lambdas sit in a
+    ``variable_declarator`` too, but a Java lambda cannot call its own variable
+    before the assignment completes, so widening there would be a new claim
+    needing its own evidence rather than this fix.
+    """
+    if lang not in _BINDING_NAMED_LANGS:
+        return None
+    return lexical_binding_name(func, lang)
+
+
+def _function_identity(func: tree_sitter.Node, lang: str) -> tuple[str, bool] | None:
+    """Return *func*'s name and whether it came from a binding, or None if nameless.
+
+    The flag is load-bearing rather than informational: a name taken from a
+    binding licenses only BARE self-calls. ``this`` is the reason - an arrow
+    does not bind its own ``this``, so inside
+    ``const api = { walk: (n) => this.walk(n) }`` the receiver is whatever
+    ``this`` is in the enclosing scope and the call is not self-recursion,
+    while inside ``class T { walk = (n) => this.walk(n) }`` it is. Telling
+    those apart means matching the enclosing class or object against the
+    receiver, which is the half #259 leaves for later, so the qualified route
+    stays closed to a binding-derived name.
+    """
+    name_node = function_name_node(func, lang)
+    if name_node is not None:
+        return node_text(name_node), False
+    bound = _binding_name(func, lang)
+    return None if bound is None else (bound, True)
+
+
+def _directly_nested_function_names(func: tree_sitter.Node, func_types: frozenset[str], lang: str) -> set[str]:
     """Return the names of functions defined directly inside *func*'s own body.
 
     The pruned walk yields each directly-nested function-definition node
@@ -706,6 +761,15 @@ def _directly_nested_function_names(func: tree_sitter.Node, func_types: frozense
         name_node = node.child_by_field_name("name")
         if name_node is not None:
             names.add(node_text(name_node))
+            continue
+        # A nested function expression shadows through its binding exactly as a
+        # nested declaration does: inside ``const walk = (n) => { const walk =
+        # (m) => m; walk(1); }`` the bare call resolves to the inner binding.
+        # Without this the widened outer lookup (#259) would report it as
+        # recursion, so the two halves have to move together.
+        bound = _binding_name(node, lang)
+        if bound is not None:
+            names.add(bound)
     return names
 
 
@@ -726,7 +790,7 @@ def _bare_call_cannot_recurse(func: tree_sitter.Node, func_name: str, func_types
 
     Qualified calls are unaffected in every case - ``self.name()`` still reports.
     """
-    if func_name in _directly_nested_function_names(func, func_types):
+    if func_name in _directly_nested_function_names(func, func_types, lang):
         return True
     if lang != _rust.EXTRA_NAME:
         return False
@@ -749,6 +813,10 @@ class _FunctionFacts:
     lang: str
     receiver_name: str | None
     bare_cannot_recurse: bool
+    #: True when :data:`name` came from the binding holding a function
+    #: expression rather than from the function's own ``name`` field. Restricts
+    #: matching to bare calls; see :func:`_function_identity`.
+    name_from_binding: bool
     shadowed_spans: tuple[tuple[int, int], ...]
     is_method: bool
     #: Java only: ``(parameter count, is varargs)`` for every same-named method in
@@ -787,10 +855,14 @@ def _is_self_call(call_node: tree_sitter.Node, facts: _FunctionFacts) -> bool:
     * an unqualified call where the name cannot denote this function, either
       function-wide (:func:`_bare_call_cannot_recurse`) or only within the block
       an import shadows it in (:func:`_rust_shadowed_spans`);
+    * a QUALIFIED call when the enclosing name came from a binding rather than
+      from the function itself (:func:`_function_identity` says why);
     * in Java, an argument count that does not fit this signature, which proves a
       different overload (:func:`_java_arity_rules_out_self`).
     """
     if _bare_call_rules_out_self(call_node, facts):
+        return False
+    if facts.name_from_binding and not _call_is_bare(call_node, facts.lang):
         return False
     if facts.lang == _java.EXTRA_NAME and _java_rules_out_self(call_node, facts):
         return False
@@ -881,6 +953,8 @@ def _build_function_facts(
     func_types: frozenset[str],
     lang: str,
     methods: dict[int, dict[str, tuple[tuple[int, bool], ...]]],
+    *,
+    name_from_binding: bool = False,
 ) -> _FunctionFacts:
     """Collect the per-function invariants the per-call predicates need."""
     # Both Go and PHP name their method node ``method_declaration``. The
@@ -895,6 +969,7 @@ def _build_function_facts(
         lang=lang,
         receiver_name=_go_receiver_name(func) if (is_method and lang == _go.EXTRA_NAME) else None,
         bare_cannot_recurse=_bare_call_cannot_recurse(func, func_name, func_types, lang),
+        name_from_binding=name_from_binding,
         shadowed_spans=_rust_shadowed_spans(func, func_name) if lang == _rust.EXTRA_NAME else (),
         is_method=is_method,
         sibling_arities=_sibling_arities(func, func_name, methods),
@@ -985,11 +1060,11 @@ class NoRecursionRule(BaseRule):
         nested binding (not recursion), so bare self-calls are skipped while
         ``self``/``this``-qualified ones still count.
         """
-        name_node = function_name_node(func, lang)
-        if name_node is None:
+        identity = _function_identity(func, lang)
+        if identity is None:
             return []
-        func_name = node_text(name_node)
-        facts = _build_function_facts(func, func_name, func_types, lang, methods)
+        func_name, name_from_binding = identity
+        facts = _build_function_facts(func, func_name, func_types, lang, methods, name_from_binding=name_from_binding)
         violations: list[Violation] = []
         for node in walk(func, skip_types=tuple(func_types)):
             if node.type not in call_types:

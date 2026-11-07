@@ -8,7 +8,7 @@ Security fixes ship to the supported lines below. Lines marked ❌ receive no se
 
 | Version(s) | Status |
 |---|---|
-| **2.17.x** (current; SAFE601 helper prefixes and callback assertions, function names resolved from their binding, SAFE901 test scoping) | ✅ Security fixes |
+| **2.17.x** (current; SAFE601 helper prefixes and callback assertions, function names resolved from their binding, SAFE901 test scoping, and in 2.17.1 block-scoped taint plus recursion through a bound function) | ✅ Security fixes |
 | **2.16.x** (SAFE601 test scoping and identity, Go support, SAFE801 evidence wording) | ✅ Security fixes |
 | **2.15.x** (false-positive precision across nine languages) | ✅ Security fixes |
 | **2.2.x - 2.14.x** (Rust in 2.2.x-2.4.x; Go in 2.5.x; PHP in 2.6.x; C in 2.7.x; C++ in 2.8.x; framework presets in 2.9.x; multi-path `check` in 2.10.x; framework-rule fast-follows in 2.11.x; SAFE601/907 precision in 2.12.x; SAFE801 property-typed sanitisers in 2.13.x; SAFE801 assignment-side sinks in 2.14.x) | ✅ Security fixes through ~6 months after the next minor lands |

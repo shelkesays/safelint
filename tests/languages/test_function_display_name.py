@@ -133,6 +133,8 @@ _WRAPPED_BINDINGS: list[tuple[str, str, str]] = [
     ("TypeScript as", "component.ts", "const Footer = (() => {{\n{body}\n}}) as Handler;\n"),
     ("TypeScript satisfies", "component.ts", "const Footer = (() => {{\n{body}\n}}) satisfies Handler;\n"),
     ("TypeScript angle assertion", "component.ts", "const Footer = <Handler>(() => {{\n{body}\n}});\n"),
+    ("TypeScript non-null assertion", "component.ts", "const Footer = (() => {{\n{body}\n}})!;\n"),
+    ("TypeScript cast then non-null", "component.ts", "const Footer = ((() => {{\n{body}\n}}) as Handler)!;\n"),
 ]
 
 

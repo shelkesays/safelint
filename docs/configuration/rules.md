@@ -251,9 +251,35 @@ max_complexity = 10
 
 Holzmann's Power of Ten rule 1 ("restrict all code to very simple control flow constructs") bans recursion outright: recursion without a guaranteed bound makes the call stack an unbounded resource, so worst-case depth (and therefore termination and memory behaviour) cannot be proven by inspection. An explicit loop with a worklist makes the bound visible.
 
-The rule fires on **direct self-recursion** - a function whose body contains a call to its own name, either bare (`fact(n - 1)`) or self-qualified (`self.walk(...)` in Python / Rust, `this.walk(...)` in JS / TS / Java). A call on a different receiver (`other.walk(...)`) does not fire. Two cases are intentionally out of scope and documented as blind spots: **indirect / mutual recursion** (`a` calls `b` calls `a`), which needs a call graph, and **anonymous-function recursion** through a binding (`const f = () => f()`), since the function has no name to match.
+The rule fires on **direct self-recursion** - a function whose body contains a call to its own name, either bare (`fact(n - 1)`) or self-qualified (`self.walk(...)` in Python / Rust, `this.walk(...)` in JS / TS / Java). A call on a different receiver (`other.walk(...)`) does not fire. In JavaScript and TypeScript the name may come from the `const` / `let` / `var` binding holding a function expression, so `const fact = (n) => n * fact(n - 1)` reports since 2.17.1 (see below). **Indirect / mutual recursion** (`a` calls `b` calls `a`) stays out of scope: it needs a call graph.
 
 Enabled by default at `warning` severity (mirrors `unbounded_loops`), so intentional recursion (tree walks, divide-and-conquer) does not block a local run. Annotate deliberate recursion with `# nosafe: SAFE105` (or the language's comment form) and a one-line justification.
+
+#### JavaScript and TypeScript: recursion through a binding
+
+An `arrow_function` has no name of its own; the name sits on the binding that holds it. Until 2.17.1 the rule matched only the function's own name, so it was silent on the form most of the ecosystem uses to declare a function while firing correctly on `function fact() {}` beside it:
+
+```javascript
+const fact = (n) => (n <= 1 ? 1 : n * fact(n - 1));   // reports since 2.17.1
+function fact(n) { return n <= 1 ? 1 : n * fact(n - 1); }  // always reported
+```
+
+Only a **variable declarator** lends its name to this route, and only for a **bare** call. The three binding forms look alike and do not behave alike, which is why the distinction is drawn rather than assumed:
+
+| Shape | Bare call | `this.`-qualified call |
+|---|---|---|
+| `const fact = (n) => ...` | **reported** - a lexical binding, so `fact(...)` is the function | not reported - an arrow takes `this` from the enclosing scope, so `this.fact` is some other object's property |
+| `{ walk: (n) => ... }` | not reported - an object property is not a lexical binding, so a bare `walk(...)` cannot reach it; it resolves to an outer binding of that name, or raises `ReferenceError` if there is none | not reported - an arrow takes `this` from the enclosing scope, so the receiver is not the object being built and cannot be shown to be this function |
+| `class T { fact = (n) => ... }` | not reported - nor is a class field a lexical binding, so the same resolution applies as for an object property | **genuine recursion, and not yet reported**; see the note below |
+
+!!! note "A class field's `this.`-qualified recursion is a known gap"
+    `class T { fact = (n) => n * this.fact(n - 1) }` really does recurse, and the rule does not report it. Reaching it means matching the enclosing class against the receiver, so that a sibling object's `this.fact(...)` is not mistaken for it; that is a separate piece of work from naming the function. Recorded rather than left to be rediscovered.
+
+The ordinary guards still apply, and they are what keeps the widening honest: a call whose callee is a member access is never a bare call, so `const trim = (s) => s.trim()` and `const getComputedStyle = (el) => window.getComputedStyle(el)` stay clean although the names match. A nested binding of the same name shadows the outer one, so `const walk = (n) => { const walk = (m) => m; return walk(n); }` is clean too. A key that is not statically spelled (`{ [walk]: ... }`) lends no name at all, since the verdict would rest on a variable whose value is unknown.
+
+Measured across the JavaScript and TypeScript validation corpora: **91 new findings across 35 functions**, none removed. The functions are what the rule exists to find, among them `mergeDeep` (a deep merge whose depth is its input's), `hasAdditionalProperties` (a recursive JSON-schema walk), Vue's `setScopeId` and `recursiveGetSubtree` over the vnode tree, and axios's `visit` over an arbitrarily nested object. Note the two units: the rule reports one finding per **call site**, so a function with four self-calls is four findings.
+
+Only JavaScript and TypeScript. Java puts a lambda in a `variable_declarator` too, and the node type is spelled the same in both grammars, so the route is gated by language rather than left to match for free: a Java lambda cannot call its own variable before the assignment completes, which would be a different claim needing its own evidence.
 
 #### What counts as "its own name"
 
@@ -732,7 +758,7 @@ function logOrder(order) {              // name contains ``log``, exempt
 
 *Changed in 2.16.0.* The rule used to report **every** `var`. That inverted its own value: on Express 1748 of 1960 default findings (89%, across 136 of 141 files) were SAFE305, so the handful of `var`s whose hoisting actually bites were indistinguishable from the rest, and the other ten rules were drowned out ([#201](https://github.com/shelkesays/safelint/issues/201)). A module-scope `var path = require("node:path")` has no observable difference from `const`; there is nothing to fix, so there is nothing to report.
 
-Four shapes are reported, each with its own message naming the hazard:
+Five shapes are reported, each with its own message naming the hazard:
 
 | Shape | Why `let` differs |
 |---|---|
@@ -740,6 +766,7 @@ Four shapes are reported, each with its own message naming the hazard:
 | Read **before its declaration** in the same execution scope | `var` yields `undefined`; `let` rejects it (TDZ) |
 | Declared in a loop and **captured by a closure** inside it | every `var` closure shares one binding and sees the final value; `let` gives each iteration its own |
 | **Re-declares** a name already bound in an overlapping scope (an earlier `var`, or a parameter) | at the same scope `let` / `const` reject the duplicate outright; from a nested block they bind a *separate* shadowing variable instead of the one already there, so assignments stop being visible outside the block. Either way the fix is a rename, not a keyword swap |
+| Declared in one **`switch` clause** and read from a later one *(2.17.1)* | entering the switch at the reading clause skips the declaration, so `var` reads `undefined` while `let` / `const` throw `Cannot access 'w' before initialization`. The fix is to declare it above the `switch` |
 
 Deliberately silent on everything else, including a `var` at function top level used only within that function, a loop counter used only inside its loop, and a `var` declared and used in the same block. A read from inside a nested function does not count as a read-before-declaration, because the closure runs after the declaration has executed. A reference inside a nested function that binds the same name is that function's own binding and is ignored.
 
@@ -774,9 +801,32 @@ function g(c) {
 }
 ```
 
-**Known limit.** A `var` declared in one `case` and read from a **later** `case` is not reported. It works as `var` and throws `Cannot access 'w' before initialization` as `let`, so it does block the conversion, but it is none of the four shapes: the declaration comes first in source order, and both sites are in the one switch scope.
+*New in 2.17.1.* Because the switch is one scope, a `var` declared in one clause and read from a later one is its own shape ([#255](https://github.com/shelkesays/safelint/issues/255)). The other four each miss it for a different reason: the declaration comes first in **source** order, so it is not a read-before-declaration, and both sites share the one switch scope, so it is not an escape. What makes it a hazard is **execution** order:
 
-The fix is mechanical in the first three cases: replace `var` with `let` (when the binding is reassigned later) or `const` (when it isn't). The rule fires once per `variable_declaration` node, so a multi-binding form like `var x = 1, y = 2;` produces a single violation (the line is the unit of fix, not each bound name).
+```javascript
+function f(k) {
+  switch (k) {
+    case 1: var w = 1; break;
+    case 2: use(w); break;   // k === 2 never ran case 1
+  }
+}
+```
+
+As `var` that reads `undefined`; as `let` it throws. `default:` counts in both directions, since it is a clause like any other. No fall-through analysis is involved and none would help: a clause carrying a label is directly reachable whenever the discriminant matches it, so the hazard holds whether or not the declaring clause ends in `break`, and the discriminant's value is exactly what cannot be known here. A read in the *same* clause is fine, and a read in an *earlier* one is already reported as a read before the declaration.
+
+If a `var` both crosses clauses and leaves the switch entirely, the escape message is shown, because it describes the more pressing half.
+
+**The fix is a keyword swap for one shape only.** Swapping `var` for `let` in place changes behaviour in three of the five, which is the point of reporting them but is not a drop-in replacement. Each line below was run against `node`:
+
+| Shape | What the fix is |
+|---|---|
+| Used outside the block | **move the declaration above the block**, then `let` / `const`. Swapping the keyword where it stands gives `ReferenceError: w is not defined`, because the binding no longer exists at the use |
+| Read before its declaration | **the read is the bug**: move it after the declaration. Swapping the keyword turns a silent `undefined` into `ReferenceError: Cannot access 'w' before initialization`, which makes the hazard visible rather than fixing it |
+| Captured by a closure in a loop | a genuine one-token swap. `let` gives each iteration its own binding, so the closures print `0,1,2` instead of `3,3,3` - the behaviour changes, and that change *is* the fix |
+| Re-declares a name in an overlapping scope | rename one of them |
+| Declared in one `switch` clause, read from a later one | declare it above the `switch` |
+
+Use `let` where the binding is reassigned later and `const` where it is not. The rule fires once per `variable_declaration` node, so a multi-binding form like `var x = 1, y = 2;` produces a single violation (the line is the unit of fix, not each bound name).
 
 If you want the old behaviour - every `var` reported, as a codemod trigger for a "modernise this codebase" pass - the rule does not provide it; use a linter rule built for that (`eslint no-var`), which is what it was competing with.
 
@@ -1419,6 +1469,22 @@ These combine AST analysis with intra-procedural taint tracking. They are more e
 **What it flags:** User-controlled input (function parameters, `input()` calls in Python, `prompt()` / `confirm()` / `getItem()` in JS, etc.) flowing into dangerous functions like `eval`, `exec`, `subprocess` (Python) or `eval` / `Function` / `child_process` (JavaScript) without being sanitized first. Cross-language.
 
 The rule tracks data flow through assignments: if `x = user_data` then `x` is tainted. If `y = x + "_suffix"` then `y` is tainted too. Calling `eval(y)` then triggers a violation. Passing the value through a configured sanitizer (e.g. `escape(x)`) clears the taint.
+
+**Taint is scoped to the block that declares a binding.** *Changed in 2.17.1.* A nested block that rebinds a name used to overwrite the function-wide entry, so the outer binding came back from the block without its taint ([#250](https://github.com/shelkesays/safelint/issues/250)):
+
+```rust
+let input = std::env::var("CMD").unwrap();   // tainted
+{ let input = "safe"; }                      // used to clear the entry
+cmd.arg(input);                              // tainted - was NOT reported
+```
+
+The same flat map was wrong in the other direction too, reporting a sink that reads a clean outer binding after an inner block tainted the name. Both are fixed in Rust, JavaScript / TypeScript, C, C++ and Go - every language where a nested block may rebind a name already in scope.
+
+Three languages are deliberately unchanged, and the reason matters if you are reading a finding in one of them. Python has no block scope. PHP's locals are function-scoped, so an inner `if (...) { $c = "safe"; }` genuinely overwrites the outer `$c` and the flat model is the correct one. Shadowing a local in a nested block is a compile error in Java. JavaScript `var` is likewise still function-scoped and hoisted: an inner-block `var` really does rebind the function-wide name, which is the hazard [SAFE305](#safe305-wide_scope_declaration) exists to report, so only `let` and `const` are scoped.
+
+A binding declared in a loop or control-statement **header** is scoped to that statement rather than to a block, since the body is its sibling rather than its parent: a `for (let p = 0; ...)` head binding ends with the loop, and Go's `if cmd := get(); c { } else { ... }` binding stays in scope through the `else`.
+
+Only **declaring** forms are scoped. A plain `x = value` inside a block writes through to the binding already in scope, so its taint survives the block, as it must.
 
 **Two wordings, by what the analysis actually traced.** *Changed in 2.16.0.* Taint is seeded from two
 places that are not equally good evidence, so the message now says which one a finding rests on:

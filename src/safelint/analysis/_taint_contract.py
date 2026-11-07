@@ -212,6 +212,108 @@ def record_state(tainted: dict[str, frozenset[str]], source_seeded: set[str], na
         source_seeded.discard(name)
 
 
+class BlockScopes:
+    """Restores a name's taint when the block that rebound it ends (#250).
+
+    Every tracker keeps one flat ``name -> status`` map per function, so a
+    nested block that rebinds a name overwrote the function-wide entry and the
+    outer binding came back without its taint. Measured on 2.16.0 and 2.17.0,
+    the flat map was wrong in BOTH directions:
+
+    .. code-block:: rust
+
+        let input = env::var("CMD").unwrap();   // tainted
+        { let input = "safe"; }                 // clears the entry
+        cmd.arg(input);                         // tainted - was NOT reported
+
+        let input = "safe";                     // clean
+        { let input = env::var("CMD").unwrap(); }
+        cmd.arg(input);                         // clean - WAS reported
+
+    The false negative is the worse direction for a security rule, and the
+    false positive is the one that wastes a reader's time, so both are fixed by
+    the same mechanism.
+
+    A full span-keyed map is not needed, because every tracker walks its
+    function once in source order: :func:`safelint.languages._node_utils.walk`
+    is a pre-order traversal, so ``start_byte`` is non-decreasing across the
+    nodes a tracker sees (asserted by a test, since the whole design rests on
+    it). A rebinding can therefore push the outer state onto a stack and the
+    tracker pops it on the first node at or past the block's end.
+
+    The pending entries are a chain of nested spans whose ends strictly
+    decrease from the bottom of the stack upwards: a sibling block's entry is
+    only ever pushed after the previous sibling's has expired. So popping from
+    the top while the top has expired restores the innermost shadow first,
+    which is the order the scopes actually close in.
+
+    Only the languages with block scope need this. Python has none, and
+    shadowing a local in a nested block is a compile error in Java, so their
+    trackers do not use it; PHP has function scope for locals, so an inner
+    ``{ $c = "safe"; }`` genuinely overwrites the outer ``$c`` and the flat map
+    is already right there.
+    """
+
+    def __init__(self) -> None:
+        """Start with nothing shadowed."""
+        self._pending: list[tuple[int, str, frozenset[str] | None, bool, bool]] = []
+
+    def rebind(
+        self,
+        tainted: dict[str, frozenset[str]],
+        source_seeded: set[str],
+        name: str,
+        block_end: int,
+    ) -> None:
+        """Remember *name*'s current state, to come back once *block_end* is passed.
+
+        Called for every block-scoped binding rather than only for one that
+        shadows something, because the two cases are not distinguishable in the
+        direction that matters: a name ABSENT from *tainted* is clean, and a
+        binding that taints it inside a block must stop being tainted when the
+        block closes. Recording "was not bound" is what makes that work.
+        """
+        self._pending.append((block_end, name, tainted.get(name), name in tainted, name in source_seeded))
+
+    def expire(self, tainted: dict[str, frozenset[str]], source_seeded: set[str], position: int) -> None:
+        """Restore every binding whose block has closed at or before *position*.
+
+        The expiry test is inside the body rather than in the condition so the
+        condition stays a comparison, which is SAFE501's requirement for a
+        bounded loop. The bound itself is the stack: every iteration pops.
+        """
+        while len(self._pending) > 0:
+            if self._pending[-1][0] > position:
+                break
+            _, name, status, was_bound, was_seeded = self._pending.pop()
+            if was_bound and status is not None:
+                tainted[name] = status
+            else:
+                tainted.pop(name, None)
+            if was_seeded:
+                source_seeded.add(name)
+            else:
+                source_seeded.discard(name)
+
+
+def enclosing_block_end(node: tree_sitter.Node, block_types: frozenset[str]) -> int | None:
+    """Return the end byte of the nearest block in *block_types* around *node*.
+
+    None when there is none, which means the binding is not block-scoped here
+    and needs no restoring: a Rust ``let`` always sits in a block, but a C
+    declaration at file scope or a JavaScript ``let`` at module top level does
+    not, and neither goes out of scope inside the function being tracked.
+
+    Iterative, never recursion - SAFE105 polices this codebase.
+    """
+    current = node.parent
+    while current is not None:
+        if current.type in block_types:
+            return current.end_byte
+        current = current.parent
+    return None
+
+
 def assignment_sink_name(target: tree_sitter.Node, member_fields: Mapping[str, tuple[str, bool]]) -> str | None:
     """Return the property name an assignment WRITES to, or None.
 
