@@ -74,17 +74,22 @@ def test_js_arithmetic_binary_expr_does_not_count(tmp_path: Path) -> None:
     assert not any(v.code == "SAFE104" for v in result.violations)
 
 
-def test_js_switch_cases_count(tmp_path: Path) -> None:
-    """Each ``case`` arm in a ``switch`` adds 1 to complexity."""
-    # 12 case arms = base 1 + 12 = 13 > 10
+def test_js_switch_counts_once_not_per_case(tmp_path: Path) -> None:
+    """A flat ``switch`` dispatch table scores 2, not one per arm (#181).
+
+    Twelve arms used to total 13 and fire. The construct is one decision point:
+    the arms are value comparisons with no ordering dependency, so a lookup
+    table is not twelve-branch code. Genuine control flow is still counted by
+    the other tests in this file.
+    """
     cases = "\n".join(f"    case {i}: return {i};" for i in range(12))
     source = f"function f(x) {{\n  switch (x) {{\n{cases}\n  }}\n}}\n"
     sample = tmp_path / "switch.js"
     sample.write_text(source, encoding="utf-8")
 
     result = _engine().check_file(str(sample))
-    safe104 = [v for v in result.violations if v.code == "SAFE104"]
-    assert len(safe104) == 1
+
+    assert not any(v.code == "SAFE104" for v in result.violations)
 
 
 def test_js_simple_function_does_not_fire(tmp_path: Path) -> None:

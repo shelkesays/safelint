@@ -79,11 +79,31 @@ def test_go_method_receiver_not_counted_as_argument(tmp_path: Path) -> None:
 
 
 def test_go_high_complexity_fires_safe104(tmp_path: Path) -> None:
-    """Switch arms plus ``&&`` / ``||`` push cyclomatic complexity over the cap."""
+    """Real control flow pushes cyclomatic complexity over the cap.
+
+    Rewritten for #181: the sample used to be twelve bare ``case`` arms, which
+    the old per-arm counting pushed to 13. The docstring claimed ``&&`` / ``||``
+    were involved but the source contained neither, so the test passed on
+    arithmetic it did not demonstrate. It now uses actual branches.
+    """
     sample = tmp_path / "cx.go"
-    arms = "\n".join(f"\tcase {i}:" for i in range(12))
-    sample.write_text(f"package main\nfunc cx() {{\n\tswitch x {{\n{arms}\n\t}}\n}}\n", encoding="utf-8")
+    ifs = "\n".join(f"\tif x == {i} && y > {i} {{\n\t\treturn\n\t}}" for i in range(6))
+    sample.write_text(f"package main\nfunc cx(x int, y int) {{\n{ifs}\n}}\n", encoding="utf-8")
+
     assert any(v.code == "SAFE104" for v in _engine().check_file(str(sample)).violations)
+
+
+def test_go_flat_switch_counts_once_not_per_case(tmp_path: Path) -> None:
+    """A twelve-arm dispatch switch scores 2 and stays clean (#181).
+
+    Go's ``case`` arms are value comparisons with no fall-through (no implicit
+    one, at least), so the construct is one decision point rather than twelve.
+    """
+    sample = tmp_path / "flat.go"
+    arms = "\n".join(f"\tcase {i}:" for i in range(12))
+    sample.write_text(f"package main\nfunc flat(x int) {{\n\tswitch x {{\n{arms}\n\t}}\n}}\n", encoding="utf-8")
+
+    assert not any(v.code == "SAFE104" for v in _engine().check_file(str(sample)).violations)
 
 
 def test_go_simple_function_complexity_is_clean(tmp_path: Path) -> None:
