@@ -155,3 +155,60 @@ def test_an_unreadable_base_ref_is_distinguishable_from_a_violation(repo: Path) 
     guarding, which is the failure mode this whole check exists to remove.
     """
     assert _run(_load_script(), repo, base="refs/heads/does-not-exist") == 2
+
+
+def test_deleting_a_released_section_is_caught(repo: Path) -> None:
+    """Losing published notes outright is worse than editing them (#279 review).
+
+    The first implementation compared only versions present in BOTH files, so
+    removing a dated heading and its notes was never looked at and passed. A
+    deletion is strictly worse than an edit: an edit leaves something to
+    compare, a deletion leaves nothing.
+    """
+    path = repo / "CHANGELOG.md"
+    text = _RELEASED
+    start = text.index("## [2.17.2] - 2026-11-07")
+    end = text.index("[2.18.0]: https://")
+    path.write_text(text[:start] + text[end:], encoding="utf-8")
+
+    assert _run(_load_script(), repo) == 1
+
+
+def test_renaming_a_released_heading_is_caught(repo: Path) -> None:
+    """A rename is a deletion as far as the released version is concerned."""
+    path = repo / "CHANGELOG.md"
+    path.write_text(_RELEASED.replace("## [2.17.2] - 2026-11-07", "## [2.17.3] - 2026-11-08"), encoding="utf-8")
+
+    assert _run(_load_script(), repo) == 1
+
+
+def test_the_deletion_message_names_the_lost_version(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """The report has to distinguish a deletion from an edit to be actionable."""
+    path = repo / "CHANGELOG.md"
+    text = _RELEASED
+    path.write_text(text[: text.index("## [2.17.2] - 2026-11-07")] + text[text.index("[2.18.0]: https://") :], encoding="utf-8")
+
+    status = _run(_load_script(), repo)
+    err = capsys.readouterr().err
+
+    assert status == 1
+    assert "deleted or renamed" in err
+    assert "2.17.2" in err
+
+
+def test_an_undecodable_changelog_cannot_tell_rather_than_crashing(repo: Path) -> None:
+    """``read_text`` raises on invalid UTF-8; the contract promises exit 2.
+
+    A guard that dies with a traceback is nearly as bad as one that passes
+    quietly - either way CI stops reporting the thing it was added for.
+    """
+    (repo / "CHANGELOG.md").write_bytes(b"\xff\xfe not valid utf-8 \xff")
+
+    assert _run(_load_script(), repo) == 2
+
+
+def test_a_missing_changelog_cannot_tell(repo: Path) -> None:
+    """Same contract when the file is absent from the working tree."""
+    (repo / "CHANGELOG.md").unlink()
+
+    assert _run(_load_script(), repo) == 2
