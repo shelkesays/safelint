@@ -46,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Validation harness: ask the binary what it scanned instead of modelling it (#192).** `_check_selection_has_files` guarded the one outcome the validation programme must never produce, a committed zero-findings report for source that was never examined, by re-deriving safelint's file discovery inside the harness: extension, excluded directory names, file-versus-directory, symlink-or-not. That second model drifted **five** separate times, each drift its own route to a false clean, and each found in review rather than by the check itself.
 
-  The mirrored tables are **deleted**, not corrected. `SCANNER_EXCLUDED_DIR_NAMES` (a copy of safelint's own `exclude_paths` defaults), `EXCLUDED_DIR_NAMES` and `_is_scannable`'s symlink and file-versus-directory guessing are gone. What replaced them cannot drift:
+The project-wide eligibility model is **deleted**, not corrected: `EXCLUDED_DIR_NAMES`, `_any_eligible`, and `_is_scannable`'s symlink and file-versus-directory guessing are gone. What replaced them cannot drift:
 
   | Route to a false clean | Now caught by |
   |---|---|
@@ -61,6 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **A missing `files_checked_by_language` degrades to "cannot check" rather than failing.** The harness exists to validate a *published* release, which may predate the key, and the map is sparse by design, so "absent because old binary" and "absent because this language contributed nothing" are indistinguishable from the map alone. `files_checked == 0` still guards an older binary. Pinned by a test, because treating absence as zero would have made the harness unusable against every earlier release.
 
   `EXTENSIONS` stays: the harness needs it to filter findings by language regardless, and it is not a model of discovery.
+
+  **One piece of mirroring survives, deliberately.** `SCANNER_EXCLUDED_DIR_NAMES` (safelint's default-skipped directory names) is still needed by the `--include` pre-flight, and review on #273 showed why: without it an `--include` pointing only into `.venv/` passed the pre-flight, the project-wide per-language tally stayed positive on source elsewhere, the findings filtered to empty, and the run would have been written up as clean for a subtree never examined. A sixth false-clean route, opened by the change that removed five. It is now pinned by a named regression test, and the drift risk is bounded to one question ("is this include pointing somewhere safelint ignores?") rather than spanning the whole eligibility model. `safelint check --list-files` is what would retire it.
 
 - **SAFE104 `complexity`: a `match` / `switch` counts once, not once per arm (#181).** McCabe measures hand-written control flow, and a dispatch table is not that. The arms are value comparisons, or in Rust a compiler-checked exhaustive match: no fall-through, no ordering dependency, and adding a variant is a compile error rather than a silent gap. A twenty-arm lookup carries a cognitive load nearer 1 than 20.
 
