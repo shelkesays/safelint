@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import itertools
+import os
 from pathlib import Path
 import re
 import shutil
@@ -34,6 +35,18 @@ def _safelint_on_path() -> Path:
     if found is None:
         pytest.skip("safelint entry point not on PATH")
     return Path(found)
+
+
+#: The harness is driven through ``--safelint <path>``, i.e. it executes whatever
+#: it is handed. Several tests therefore stand up a fake scanner as a ``#!/bin/sh``
+#: script, which Windows cannot execute at all (``WinError 193: %1 is not a valid
+#: Win32 application``) - it has no shebang handling. The *harness* logic these
+#: tests exercise (crash envelopes, malformed ``list-rules`` output, rule-entry
+#: validation) is platform-independent and stays covered by the POSIX jobs; only
+#: the fixture's delivery mechanism is POSIX-only. Making them run on Windows
+#: means teaching the harness to accept a command list rather than an executable
+#: path, which is a harness redesign and not in scope here.
+_NEEDS_SHELL_SCRIPT = pytest.mark.skipif(os.name == "nt", reason="fixture is a #!/bin/sh script; Windows cannot execute one (WinError 193)")
 
 
 def _load_harness():
@@ -100,6 +113,7 @@ def test_rules_for_asks_the_binary_not_the_checkout() -> None:
     assert sys.version_info >= (3, 11)
 
 
+@_NEEDS_SHELL_SCRIPT
 def test_a_crashing_binary_is_an_error_not_a_clean_run(tmp_path: Path) -> None:
     """A run with no JSON report raises; it must never be recorded as zero findings."""
     fake = tmp_path / "safelint"
@@ -135,8 +149,14 @@ def test_peak_rss_is_measured_per_run(tmp_path: Path) -> None:
     harness = _load_harness()
     env = harness._measured([sys.executable, "-c", "import sys; print('{}'); sys.exit(3)"])
     assert env["rc"] == 3
-    assert env["rss_mb"] > 0
     assert env["out"].strip() == "{}"
+    # ``resource`` is POSIX-only, so Windows reports no RSS rather than a wrong
+    # number. Asserted both ways instead of skipped, so a platform that starts
+    # or stops measuring shows up here.
+    if os.name == "nt":
+        assert env["rss_mb"] is None
+    else:
+        assert env["rss_mb"] > 0
 
 
 def test_include_narrows_results_to_a_subtree(tmp_path: Path) -> None:
@@ -166,7 +186,9 @@ def test_include_narrows_results_to_a_subtree(tmp_path: Path) -> None:
 
     assert len(whole_files) == 2, "both crates report without --include"
     assert len(subtree_files) == 1, "--include keeps only the subtree"
-    assert all("crates/ty_" in f for f in subtree_files)
+    # JSON ``filepath`` carries the platform separator (unlike SARIF, which is
+    # URI-normalised), so compare on a normalised copy rather than assuming "/".
+    assert all("crates/ty_" in f.replace("\\", "/") for f in subtree_files)
     assert subtree_defaults.files_with_findings == 1
 
     summary = harness.write_outputs(subtree, "0.0.0-test", "abc1234567", subtree_runs)
@@ -287,6 +309,7 @@ def test_a_scan_that_hangs_is_an_error_not_a_clean_run(tmp_path: Path) -> None:
     ),
     ids=["missing-languages", "languages-null", "name-not-str", "languages-bare-str", "languages-item-not-str"],
 )
+@_NEEDS_SHELL_SCRIPT
 def test_malformed_rule_entries_are_a_harness_error(tmp_path: Path, payload: str) -> None:
     """Entry SHAPE is validated, not merely the presence of the two keys.
 
@@ -304,6 +327,7 @@ def test_malformed_rule_entries_are_a_harness_error(tmp_path: Path, payload: str
         harness.rules_for(fake, "python")
 
 
+@_NEEDS_SHELL_SCRIPT
 def test_well_formed_rule_entries_are_accepted(tmp_path: Path) -> None:
     """The guard must not reject a valid registry - language filtering still works."""
     fake = tmp_path / "safelint"
@@ -470,6 +494,7 @@ def test_a_directory_named_like_a_source_file_is_not_eligible(tmp_path: Path) ->
         harness.validate(target)
 
 
+@_NEEDS_SHELL_SCRIPT
 def test_unparseable_list_rules_output_is_a_harness_error(tmp_path: Path) -> None:
     """A binary that exits 0 with non-JSON output must not raise JSONDecodeError.
 
