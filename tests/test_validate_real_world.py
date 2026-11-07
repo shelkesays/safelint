@@ -265,7 +265,7 @@ def test_a_project_with_no_files_of_the_language_is_an_error(tmp_path: Path) -> 
 
     harness = _load_harness()
     target = harness.Target(_safelint_on_path(), "rust", project, "wrong", out_dir=tmp_path / "o")
-    with pytest.raises(harness.HarnessError, match="no scannable rust file"):
+    with pytest.raises(harness.HarnessError, match="safelint read no rust file"):
         harness.validate(target)
 
 
@@ -350,7 +350,7 @@ def test_an_include_matching_no_source_file_is_an_error(tmp_path: Path) -> None:
 
     harness = _load_harness()
     typo = harness.Target(_safelint_on_path(), "python", project, "m", include="crates/typo_", out_dir=tmp_path / "o")
-    with pytest.raises(harness.HarnessError, match="selects no scannable python file"):
+    with pytest.raises(harness.HarnessError, match="selects no python file"):
         harness.validate(typo)
 
 
@@ -372,7 +372,7 @@ def test_a_symlinked_source_file_is_not_eligible(tmp_path: Path) -> None:
 
     harness = _load_harness()
     target = harness.Target(_safelint_on_path(), "python", project, "sym", out_dir=tmp_path / "o")
-    with pytest.raises(harness.HarnessError, match="no scannable python file"):
+    with pytest.raises(harness.HarnessError, match="safelint read 0 files"):
         harness.validate(target)
 
 
@@ -390,7 +390,7 @@ def test_files_only_under_a_scanner_excluded_tree_are_not_eligible(tmp_path: Pat
 
     harness = _load_harness()
     target = harness.Target(_safelint_on_path(), "python", project, "v", out_dir=tmp_path / "o")
-    with pytest.raises(harness.HarnessError, match="no scannable python file"):
+    with pytest.raises(harness.HarnessError, match="safelint read 0 files"):
         harness.validate(target)
 
 
@@ -402,21 +402,19 @@ def test_generated_config_adds_only_the_harness_specific_excludes(tmp_path: Path
     serialises something safelint cannot read, which is the half that actually
     has to work.
 
-    Eligibility has to know both sets; the config only needs the difference, and
-    re-listing safelint's defaults would obscure what the harness changes.
+    Asserted as an EXACT set rather than by checking safelint's own default
+    names are absent: #192 deleted the harness's copy of those defaults, so
+    there is no list left to check against - and exact equality is the stronger
+    statement anyway, since it fails on an unexpected addition too.
     """
     harness = _load_harness()
     target = harness.Target(Path("safelint"), "python", tmp_path, "cfg")
     harness.write_config(tmp_path, target, [])
     written = tomllib.loads((tmp_path / "safelint.toml").read_text(encoding="utf-8"))
 
-    excludes = written["extend_exclude_paths"]
-    for name in harness.HARNESS_EXCLUDED_DIR_NAMES:
-        assert f"{name}/**" in excludes, f"{name} missing its root-level pattern"
-        assert f"**/{name}/**" in excludes, f"{name} missing its any-depth pattern"
-    for name in harness.SCANNER_EXCLUDED_DIR_NAMES:
-        assert f"{name}/**" not in excludes, f"{name} is already a safelint default"
-        assert name in harness.EXCLUDED_DIR_NAMES, f"{name} must still block eligibility"
+    expected = {pattern for name in harness.HARNESS_EXCLUDED_DIR_NAMES for pattern in (f"{name}/**", f"**/{name}/**")}
+
+    assert set(written["extend_exclude_paths"]) == expected
 
 
 def test_the_generated_exclusions_actually_suppress_findings(tmp_path: Path) -> None:
@@ -451,7 +449,7 @@ def test_an_include_matching_only_vendored_files_is_an_error(tmp_path: Path) -> 
 
     harness = _load_harness()
     target = harness.Target(_safelint_on_path(), "python", project, "m", include="vendor", out_dir=tmp_path / "o")
-    with pytest.raises(harness.HarnessError, match="selects no scannable python file"):
+    with pytest.raises(harness.HarnessError, match="selects no python file"):
         harness.validate(target)
 
 
@@ -490,7 +488,7 @@ def test_a_directory_named_like_a_source_file_is_not_eligible(tmp_path: Path) ->
 
     harness = _load_harness()
     target = harness.Target(_safelint_on_path(), "python", project, "m", include="crates/ty_", out_dir=tmp_path / "o")
-    with pytest.raises(harness.HarnessError, match="selects no scannable python file"):
+    with pytest.raises(harness.HarnessError, match="selects no python file"):
         harness.validate(target)
 
 
@@ -530,17 +528,22 @@ def test_a_wedged_measurement_wrapper_is_an_error_not_a_hang() -> None:
     assert time.perf_counter() - started < 20, "the bound must fire, not wait out the sleep"
 
 
-def test_the_eligibility_walk_prunes_excluded_trees(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Excluded directories are PRUNED, not enumerated and discarded.
+def test_the_include_walk_prunes_harness_excluded_trees(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The harness's own excluded directories are PRUNED, not walked and discarded.
 
     Asserted by recording which directories the walk actually enters, because
     the obvious alternatives do not test pruning at all: a symlink-loop test
     passes on any `os.walk` (`followlinks=False` terminates whether or not
     dirnames are pruned), and a timing test would be flaky. This spy fails if
     the implementation descends into an excluded tree and filters afterwards.
+
+    Uses `vendor/` rather than `node_modules/`: after #192 the harness prunes
+    only the trees IT adds to the config, because safelint's own defaults are no
+    longer mirrored here. A project whose only source sits under
+    `node_modules/` is now caught by safelint's own `files_checked == 0`.
     """
     project = tmp_path / "proj"
-    (project / "node_modules" / "dep" / "deeper").mkdir(parents=True)
+    (project / "vendor" / "dep" / "deeper").mkdir(parents=True)
     (project / "src").mkdir()
 
     harness = _load_harness()
@@ -554,9 +557,9 @@ def test_the_eligibility_walk_prunes_excluded_trees(tmp_path: Path, monkeypatch:
             yield dirpath, dirnames, filenames
 
     monkeypatch.setattr(harness.os, "walk", spy)
-    target = harness.Target(Path("safelint"), "python", project, "p")
-    with pytest.raises(harness.HarnessError, match="no scannable python file"):
-        harness._check_selection_has_files(target)
+    target = harness.Target(Path("safelint"), "python", project, "p", include="src/")
+    with pytest.raises(harness.HarnessError, match="selects no python file"):
+        harness._check_include_selects_files(target)
 
     assert str(project) in visited, "the project root is walked"
     assert str(project / "src") in visited, "non-excluded subtrees are still walked"
@@ -578,7 +581,7 @@ def test_a_run_that_read_zero_files_is_an_error_not_a_result(tmp_path: Path, mon
     (project / ".venv" / "dep.py").write_text("x = 1\n", encoding="utf-8")
 
     harness = _load_harness()
-    monkeypatch.setattr(harness, "_check_selection_has_files", lambda _target: None)
+    monkeypatch.setattr(harness, "_check_include_selects_files", lambda _target: None)
     target = harness.Target(_safelint_on_path(), "python", project, "zero", out_dir=tmp_path / "o")
 
     with pytest.raises(harness.HarnessError, match="read 0 files, so there is nothing to report"):
@@ -596,8 +599,58 @@ def test_the_zero_files_error_carries_safelints_own_reason(tmp_path: Path, monke
     (project / "node_modules" / "dep.py").write_text("x = 1\n", encoding="utf-8")
 
     harness = _load_harness()
-    monkeypatch.setattr(harness, "_check_selection_has_files", lambda _target: None)
+    monkeypatch.setattr(harness, "_check_include_selects_files", lambda _target: None)
     target = harness.Target(_safelint_on_path(), "python", project, "why", out_dir=tmp_path / "o")
 
     with pytest.raises(harness.HarnessError, match="no files linted under"):
         harness.validate(target)
+
+
+def test_an_older_binary_without_per_language_counts_is_not_rejected(tmp_path: Path) -> None:
+    """A missing key means "cannot check", not "read nothing" (#192).
+
+    The harness validates a *published* release, which may predate
+    ``files_checked_by_language`` (added 2.18.0). The map is also sparse by
+    design, so "key absent because old binary" and "key absent because this
+    language contributed nothing" look identical from the map alone. Failing on
+    absence would make the harness unusable against every earlier release, so
+    it degrades instead; ``files_checked == 0`` still guards that binary.
+    """
+    harness = _load_harness()
+    target = harness.Target(Path("safelint"), "python", tmp_path, "old")
+
+    harness._check_language_was_read({"summary": {"files_checked": 12}}, target, "defaults")
+
+
+def test_reading_no_file_of_the_target_language_is_an_error(tmp_path: Path) -> None:
+    """The wrong ``--lang`` is caught by safelint's own tally, not by mirroring.
+
+    This is route 2 of #192's five, and the one ``files_checked`` alone could
+    never catch: it counts every language, so ``--lang rust`` against a Python
+    repository reports a healthy positive count while reading no Rust at all.
+    """
+    harness = _load_harness()
+    target = harness.Target(Path("safelint"), "rust", tmp_path, "wrong")
+    payload = {"summary": {"files_checked": 12, "files_checked_by_language": {"python": 12}}}
+
+    with pytest.raises(harness.HarnessError, match="safelint read no rust file"):
+        harness._check_language_was_read(payload, target, "defaults")
+
+
+def test_the_wrong_language_error_names_what_was_actually_read(tmp_path: Path) -> None:
+    """The message has to be actionable: say what the project does contain."""
+    harness = _load_harness()
+    target = harness.Target(Path("safelint"), "go", tmp_path, "wrong")
+    payload = {"summary": {"files_checked": 9, "files_checked_by_language": {"python": 7, "c": 2}}}
+
+    with pytest.raises(harness.HarnessError, match=r"it read c=2, python=7"):
+        harness._check_language_was_read(payload, target, "defaults")
+
+
+def test_a_language_that_was_read_passes(tmp_path: Path) -> None:
+    """No false positives: a positive count for the target language is fine."""
+    harness = _load_harness()
+    target = harness.Target(Path("safelint"), "python", tmp_path, "ok")
+    payload = {"summary": {"files_checked": 12, "files_checked_by_language": {"python": 12}}}
+
+    harness._check_language_was_read(payload, target, "defaults")
