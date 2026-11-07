@@ -31,6 +31,7 @@ kept distinct so CI can tell "this is wrong" from "I could not tell".
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from pathlib import Path
 import re
 import subprocess
@@ -90,7 +91,10 @@ def _duplicate_versions(text: str) -> list[str]:
     of 10.
     """
     versions = [match.group("version") for line in text.split("\n") if (match := _DATED_HEADING.match(line)) is not None]
-    return sorted({version for version in versions if versions.count(version) > 1})
+    # ``Counter`` rather than ``list.count`` per heading: that rescanned the
+    # whole list each time, so a PR-controlled changelog with many headings cost
+    # quadratic CI time (#281 review). Linear, and no less readable.
+    return sorted(version for version, count in Counter(versions).items() if count > 1)
 
 
 def _footer_links(text: str) -> dict[str, str]:
@@ -104,13 +108,22 @@ def _footer_links(text: str) -> dict[str, str]:
 
 
 def _git(*args: str) -> str | None:
-    """Run a read-only git command and return stdout, or None on any failure.
+    r"""Run a read-only git command and return stdout, or None on any failure.
 
     ``text=True`` decodes, so an invalid blob raises ``UnicodeDecodeError``
     rather than returning - which escaped the caller and crashed instead of
-    reporting the documented "cannot tell" status (#280 review). Decoded here
-    with a replacement policy instead: a changelog that cannot be decoded
-    cleanly is still worth comparing, and a crash tells nobody anything.
+    reporting the documented "cannot tell" status (#280 review).
+
+    Decoded **strictly** here, returning None on failure. An earlier fix used
+    ``errors="replace"``, which was worse than the crash it removed: every
+    invalid byte becomes the same U+FFFD, so two *different* undecodable bytes
+    compare equal and an edit between them slips through silently (#281
+    review). Verified - ``b"x\xff"`` and ``b"x\xfe"`` are distinct bytes and
+    identical after replacement.
+
+    "Cannot tell" is the honest answer for input we cannot read exactly, and
+    having a third exit state is precisely so this does not have to be forced
+    into a pass or a fail.
     """
     try:
         done = subprocess.run(["git", *args], capture_output=True, check=False)  # noqa: S603, S607 - argv list, no shell; git from PATH as elsewhere in scripts/
@@ -118,7 +131,10 @@ def _git(*args: str) -> str | None:
         return None
     if done.returncode != 0:
         return None
-    return done.stdout.decode("utf-8", errors="replace")
+    try:
+        return done.stdout.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
 
 
 def _comparison_ref(base_ref: str) -> str | None:
