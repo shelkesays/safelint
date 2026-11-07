@@ -37,7 +37,7 @@ Headers fare worst, which matters most for a header-heavy library: fmt's failure
 
 ### What defeats the parser
 
-Every cause traced so far is the preprocessor or a compiler extension, and the code is valid:
+Nearly every cause is the preprocessor or a compiler extension, and the code is valid:
 
 ```c
 // conditional compilation INSIDE an expression
@@ -60,12 +60,14 @@ static int mem_addf(struct mem *mem, const char *format, ...)
 if(__builtin_available(macOS 10.12, iOS 5, *)) {}
 ```
 
+There is a second, smaller cause that only affects `.h` headers in a **C++** project: `.h` lints as C (see the [C++ page](cpp.md#file-extensions)), so C++ syntax in it defeats the C grammar no matter what the preprocessor does. Re-running fmt's 24 failing `.h` headers under the C++ grammar separates the two: 4 parse clean, so the C grammar alone was the problem; the other 20 still fail, so they are genuinely macro or directive shapes. Renaming to `.hpp` / `.hxx` / `.hh` therefore recovers that minority and nothing more.
+
 Because of this the `SAFE000` message on C and C++ names the preprocessor instead of telling you to check your syntax. The hint is per-language, not per-cause: safelint cannot distinguish "valid code the preprocessor would fix" from a genuine typo, so a real syntax error also reads as a possible preprocessor issue. By error kind, roughly three quarters of the failures are a bare `syntax error` and a fifth a `missing ';'` (the macro-as-declarator shape); redis also shows 14 `missing '#endif'`, the conditional-compilation shape proper.
 
 ### Working with it
 
-- **Count the `SAFE000` findings before trusting a clean report.** They are 10-14% of all default findings on the projects above, so a run with no other violations may still have read only half the tree. A summary line for skipped files is tracked in [#175](https://github.com/shelkesays/safelint/issues/175).
-- **Lint preprocessed output** where a build can produce it (`cc -E`), at the cost of losing line numbers that map back to your source.
+- **Count the `SAFE000` findings before trusting a clean report**, and count them from a full scan: `safelint check . --all-files`, since without `--all-files` the run only covers git-modified files and its count says nothing about the project. They are 10-14% of all default findings on the projects above, so a run with no other violations may still have read only half the tree. A summary line for skipped files is tracked in [#175](https://github.com/shelkesays/safelint/issues/175).
+- **Lint preprocessed output** where a build can produce it (`cc -E`). Three things are lost, not just one: line numbers that map back to your source, every inactive branch (whatever the build's own `-D` flags excluded is simply not there), and the directives themselves, which silently retires the opt-in SAFE311 `complex_macro` and SAFE312 `conditional_compilation` rules because the nodes they match no longer exist.
 - **`ignore = ["SAFE000"]`** silences the parse errors if the noise outweighs the signal for you. It does not make the files analysable; it only hides the fact that they were skipped. Prefer leaving them visible.
 
 Tracked as [#206](https://github.com/shelkesays/safelint/issues/206), with a preprocessor-tolerant parse pass as the open question.
