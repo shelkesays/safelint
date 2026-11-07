@@ -2564,7 +2564,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe104-complexity">SAFE104</a></td>
 <td><code>complexity</code></td>
-<td>Cyclomatic complexity: every <code>if_expression</code> / <code>for_expression</code> / <code>while_expression</code> / <code>loop_expression</code> / <code>match_arm</code> / <code>try_expression</code> (<code>foo()?</code>) adds one. <code>&amp;&amp;</code> / <code>\|\|</code> inside <code>binary_expression</code> each add one. Default cap 10.</td>
+<td>Cyclomatic complexity: every <code>if_expression</code> / <code>for_expression</code> / <code>while_expression</code> / <code>loop_expression</code> / <code>try_expression</code> (<code>foo()?</code>) adds one, and a <code>match_expression</code> adds one for the whole construct. A guarded arm (<code>n if cond =&gt;</code>) adds one more. <code>&amp;&amp;</code> / <code>\|\|</code> inside <code>binary_expression</code> each add one. Default cap 10.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe105-no_recursion">SAFE105</a></td>

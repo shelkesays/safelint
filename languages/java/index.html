@@ -2530,7 +2530,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe104-complexity">SAFE104</a></td>
 <td><code>complexity</code></td>
-<td>Cyclomatic complexity, every <code>if</code> / <code>for</code> / <code>enhanced_for</code> / <code>while</code> / <code>do</code> / <code>catch</code> / ternary adds one. Both Java switch shapes count their cases: colon-form (<code>switch_block_statement_group</code>) and arrow-form (<code>switch_rule</code>, Java 14+). <code>&amp;&amp;</code> / <code>\|\|</code> short-circuit operators inside <code>binary_expression</code> add one each (no <code>??</code>; Java uses <code>Objects.requireNonNullElse</code> for null-coalescing). Default cap 10.</td>
+<td>Cyclomatic complexity, every <code>if</code> / <code>for</code> / <code>enhanced_for</code> / <code>while</code> / <code>do</code> / <code>catch</code> / ternary adds one. A <code>switch_expression</code> adds one for the whole construct, covering the colon and arrow forms alike, rather than one per case. A Java 21 pattern guard (<code>case Integer i when i &gt; 0</code>) adds one more. <code>&amp;&amp;</code> / <code>\|\|</code> short-circuit operators inside <code>binary_expression</code> add one each (no <code>??</code>; Java uses <code>Objects.requireNonNullElse</code> for null-coalescing). Default cap 10.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe105-no_recursion">SAFE105</a></td>

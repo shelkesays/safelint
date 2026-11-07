@@ -2482,7 +2482,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe104-complexity">SAFE104</a></td>
 <td><code>complexity</code></td>
-<td>Cyclomatic complexity, every <code>if</code> / <code>elif</code> / <code>for</code> / <code>while</code> / <code>except</code> / <code>case</code> / ternary / <code>and</code> / <code>or</code> adds one. Default cap 10.</td>
+<td>Cyclomatic complexity, every <code>if</code> / <code>elif</code> / <code>for</code> / <code>while</code> / <code>except</code> / ternary / <code>and</code> / <code>or</code> adds one; a <code>match</code> statement adds one for the whole construct, not one per <code>case</code>. (Before 2.18.0 <code>match</code> added nothing at all, so this is marginally stricter.) A <code>case X if cond</code> guard adds one as an ordinary <code>if_clause</code>. Default cap 10.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe105-no_recursion">SAFE105</a></td>

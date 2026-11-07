@@ -2470,7 +2470,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe104-complexity">SAFE104</a></td>
 <td><code>complexity</code></td>
-<td>Cyclomatic complexity, every <code>if</code> / <code>else if</code> / <code>for</code> / <code>while</code> / <code>case</code> / <code>catch</code> / ternary / <code>&amp;&amp;</code> / <code>||</code> / <code>??</code> adds one. Default cap 10.</td>
+<td>Cyclomatic complexity, every <code>if</code> / <code>else if</code> / <code>for</code> / <code>while</code> / <code>catch</code> / ternary / <code>&amp;&amp;</code> / <code>\|\|</code> / <code>??</code> adds one; a <code>switch</code> adds one for the whole construct, not one per <code>case</code>. Default cap 10.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe105-no_recursion">SAFE105</a></td>

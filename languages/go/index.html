@@ -2567,7 +2567,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe104-complexity">SAFE104</a></td>
 <td><code>complexity</code></td>
-<td>Cyclomatic complexity: every <code>if</code> / <code>for</code> / <code>expression_case</code> / <code>type_case</code> / <code>communication_case</code> adds one; <code>&amp;&amp;</code> / <code>\|\|</code> inside <code>binary_expression</code> each add one. The <code>default</code> case is not counted (it adds no decision). Default cap 10.</td>
+<td>Cyclomatic complexity: every <code>if</code> / <code>for</code> adds one, and an <code>expression_switch_statement</code> / <code>type_switch_statement</code> / <code>select_statement</code> adds one for the whole construct rather than one per <code>case</code>. <code>&amp;&amp;</code> / <code>\|\|</code> inside <code>binary_expression</code> each add one. Go has no arm guards. Default cap 10.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe105-no_recursion">SAFE105</a></td>

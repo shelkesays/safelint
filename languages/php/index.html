@@ -2591,7 +2591,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe104-complexity">SAFE104</a></td>
 <td><code>complexity</code></td>
-<td>Cyclomatic complexity: every <code>if</code> / <code>for</code> / <code>foreach</code> / <code>while</code> / <code>do</code> / <code>case</code> / <code>catch</code> adds one; <code>&amp;&amp;</code> / <code>\|\|</code> (and <code>and</code> / <code>or</code>) each add one. The <code>default</code> case is not counted (it adds no decision). Default cap 10.</td>
+<td>Cyclomatic complexity: every <code>if</code> / <code>for</code> / <code>foreach</code> / <code>while</code> / <code>do</code> / <code>catch</code> adds one, and a <code>switch_statement</code> or <code>match_expression</code> adds one for the whole construct rather than one per arm. <code>&amp;&amp;</code> / <code>\|\|</code> (and <code>and</code> / <code>or</code>) each add one. PHP arms are value comparisons, so there are no guards to surcharge. Default cap 10.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe105-no_recursion">SAFE105</a></td>
