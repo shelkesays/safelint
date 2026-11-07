@@ -66,6 +66,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Reset development to main even when the guard would refuse. The old tip is still archived first."
+        type: boolean
+        default: false
 
 permissions:
   contents: read  # the force-push and the archive push both go through RELEASE_PAT
@@ -91,6 +96,10 @@ jobs:
           # RELEASE_PAT: force-pushing development needs to bypass its protection
           # (the default GITHUB_TOKEN cannot). Same token as publish.yml.
           RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
+          # Read through the environment rather than interpolated into the
+          # script body: `inputs.force` is absent on a push trigger, and an
+          # unquoted expansion there would leave a syntax hole in the shell.
+          FORCE: ${{ inputs.force || 'false' }}
         run: |
           set -euo pipefail
           git fetch origin main development --quiet
@@ -244,15 +253,24 @@ jobs:
           }
 
           # Report a refusal to reset. Two callers now, so it lives in one place.
+          #
+          # The caller exits NON-ZERO after this (#277). It used to exit 0, so a
+          # refusal was a green run whose only trace was an annotation - which in
+          # the Actions list is indistinguishable from a sync that worked, and the
+          # branches sat unsynced for a whole release before anyone looked. A
+          # refusal always needs a human to land the work or dispatch with
+          # ``force``, so it is actionable by definition and belongs red.
           skip_reset() {
-            echo "::warning::development NOT reset: it has $1 commit(s) main lacks and $3. Land that work on main, or dispatch this workflow once it has shipped."
+            echo "::error::development NOT reset: it has $1 commit(s) main lacks and $3. Land that work on main, or re-run this workflow with force=true (which archives the old tip first)."
             {
               echo "### development left as it is"
               echo
               echo "- development \`$2\` has \`$1\` commit(s) not reachable from main \`${MAIN:0:7}\`"
               echo "- $3"
               echo "- nothing was archived or reset; this is the guard against a push to main discarding unshipped work"
-              echo "- to sync anyway, land that work on main first, or re-run this workflow once it has shipped"
+              echo "- to sync anyway: land that work on main first, or re-run this workflow with \`force=true\`"
+              echo "- \`force\` still archives development's tip to \`archive/development-$2\` before resetting, so it is recoverable"
+              echo "- the commits may already be on main under different SHAs (a squash or rebase merge). \`git cherry origin/main origin/development\` tells you: every line prefixed \`-\` means the patch is upstream already and \`force\` is lossless"
             } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
           }
 
@@ -291,7 +309,21 @@ jobs:
             # warning (the first real run of this workflow hit it and the
             # warning was pure noise). Above zero, the versions decide.
             AHEAD=$(git rev-list --count "$MAIN..$DEV")
-            if [ "$AHEAD" -gt 0 ]; then
+            # ``force`` is the escape hatch the refusal message already told
+            # people to use, and until #277 it did not exist: dispatching ran the
+            # identical guard, so a deadlock had no way out short of a manual
+            # force-push past branch protection. The archive below still runs,
+            # so this stays recoverable.
+            if [ "$FORCE" = "true" ] && [ "$AHEAD" -gt 0 ]; then
+              echo "::notice::force requested: skipping the unshipped-work guard. development has $AHEAD commit(s) main lacks; the old tip is archived below."
+              {
+                echo "### development reset with \`force\`"
+                echo
+                echo "- the unshipped-work guard was skipped on purpose"
+                echo "- development \`$DEV_SHORT\` had \`$AHEAD\` commit(s) not reachable from main \`${MAIN:0:7}\`"
+                echo "- the old tip is preserved at \`archive/development-$DEV_SHORT\`"
+              } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+            elif [ "$AHEAD" -gt 0 ]; then
               DEV_VERSION=$(version_at "$DEV")
               MAIN_VERSION=$(version_at "$MAIN")
               # Two independent questions, both of which must answer yes:
@@ -299,11 +331,11 @@ jobs:
               # this exact COMMIT the one that prerelease published?
               if ! VERDICT=$(reset_is_safe "$DEV_VERSION" "$MAIN_VERSION"); then
                 skip_reset "$AHEAD" "$DEV_SHORT" "version check: $VERDICT (development \`$DEV_VERSION\`, main \`$MAIN_VERSION\`)"
-                exit 0
+                exit 1
               fi
               if ! tip_is_the_published_rc "$DEV_VERSION" "$DEV"; then
                 skip_reset "$AHEAD" "$DEV_SHORT" "development's tip is not the commit published as \`v$DEV_VERSION\`, so it has grown commits since that prerelease shipped (or that prerelease was never published)"
-                exit 0
+                exit 1
               fi
               echo "::notice::development has $AHEAD commit(s) main lacks, but $VERDICT ($DEV_VERSION against $MAIN_VERSION) and its tip is the commit published as v$DEV_VERSION; resetting."
             fi
