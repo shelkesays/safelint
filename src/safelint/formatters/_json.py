@@ -50,6 +50,7 @@ from typing import TYPE_CHECKING, Any
 
 from safelint import __version__
 from safelint.core._diagnostics import visible
+from safelint.formatters._counts import RunCoverage
 
 
 if TYPE_CHECKING:
@@ -134,15 +135,33 @@ def _build_summary(
     blocking_count: int,
     fail_on: str,
     files_checked: int,
+    coverage: RunCoverage | None = None,
 ) -> dict[str, Any]:
-    """Build the top-level ``summary`` block."""
+    """Build the top-level ``summary`` block.
+
+    ``files_checked`` keeps its original meaning: every file safelint reached.
+    ``files_skipped`` is how many of those could not be parsed and so had **no
+    rule run against them**, and ``files_analysed`` is the difference, which is
+    the number a consumer actually wants when asking about coverage (#175).
+    Conflating the two overstated coverage: a file that failed to parse was
+    read, not analysed.
+
+    ``files_checked_by_language`` breaks the total down by registered language
+    name (#196). It is **sparse**: a language that contributed no files is
+    absent rather than present with a zero, so the common single-language case
+    stays small and "absent means none read" is unambiguous.
+    """
     violations_list = list(violations)
     n_errors = sum(1 for v in violations_list if v.severity == "error")
     n_warnings = sum(1 for v in violations_list if v.severity == "warning")
     suppressed_list = list(suppressed)
     suppressed_counts = Counter(v.code or v.rule for v in suppressed_list)
+    cov = coverage if coverage is not None else RunCoverage()
     return {
         "files_checked": files_checked,
+        "files_analysed": files_checked - cov.files_skipped,
+        "files_skipped": cov.files_skipped,
+        "files_checked_by_language": dict(sorted(cov.by_language.items())),
         "violations": len(violations_list),
         "errors": n_errors,
         "warnings": n_warnings,
@@ -162,6 +181,7 @@ def format_json(
     blocking_count: int,
     fail_on: str,
     files_checked: int,
+    coverage: RunCoverage | None = None,
     indent: int | None = 2,
 ) -> str:
     """Return a JSON document representing *violations* + *suppressed*.
@@ -178,6 +198,7 @@ def format_json(
             blocking_count=blocking_count,
             fail_on=fail_on,
             files_checked=files_checked,
+            coverage=coverage,
         ),
         "violations": [_violation_to_dict(v) for v in violations],
         "suppressed": [_violation_to_dict(v) for v in suppressed],

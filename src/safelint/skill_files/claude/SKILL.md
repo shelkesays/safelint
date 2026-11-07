@@ -92,6 +92,9 @@ The schema is documented in [`docs/json-schema.md`](https://github.com/shelkesay
   "version": "1.x.y",
   "summary": {
     "files_checked": N,
+    "files_analysed": N,
+    "files_skipped": N,
+    "files_checked_by_language": {"python": N, "rust": N},
     "violations": N,
     "errors": N,
     "warnings": N,
@@ -119,6 +122,8 @@ The schema is documented in [`docs/json-schema.md`](https://github.com/shelkesay
 
 Violation objects are language-agnostic. The `filepath` field tells you which language each violation came from (via extension); use that if you want to group results by language.
 
+**Read coverage from `files_analysed`, not `files_checked`.** A file that fails to parse is read, counted in `files_checked`, and then skipped by **every rule**, so `files_checked` overstates what was actually examined. `files_skipped` is how many were lost that way, and it stays accurate even when `SAFE000` is in the project's `ignore` list. Before you tell a user their code is clean, check `files_skipped`: if it is non-zero, say so and name the count. `files_checked_by_language` lets you confirm the run actually read the language you were asked about, which is the difference between "no findings in your Go" and "no Go was read".
+
 The `suggestions[]` array (added in v1.8.0) is **advisory only**. Each `Suggestion` carries a one-line `description` and zero or more `TextEdit` entries (half-open `[start, end)` ranges plus the literal `replacement` text). Surface them to the user as offered quick-fixes, but **never apply them automatically**. safelint is a review tool, not a refactoring tool, and the user must confirm every edit. Empty `edits` arrays are valid: a description-only suggestion is a hint, not a fix recipe.
 
 ## Step 6: Present results
@@ -126,7 +131,8 @@ The `suggestions[]` array (added in v1.8.0) is **advisory only**. Each `Suggesti
 Order matters: lead with what the user needs first.
 
 1. **One-line headline.** Examples:
-   - `Clean run: 12 files checked, no violations.` (if zero)
+   - `Clean run: 12 files analysed, no violations.` (if zero, and `files_skipped` is 0)
+   - `11 of 12 files analysed, no violations. 1 file could not be parsed and was NOT analysed.` (if `files_skipped` is non-zero: never report a clean run without this)
    - `Clean run: 12 files checked. 3 violations suppressed (2 SAFE501, 1 SAFE304).` (clean but with suppressions)
    - `Found 4 errors and 7 warnings across 5 files (1 suppressed).` (otherwise)
 

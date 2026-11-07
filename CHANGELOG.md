@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The run summary now says how many files it could not analyse (#175).** A parse failure removes a file from analysis entirely: one `SAFE000` is emitted and then every rule skips it. The summary counted it in `files_checked` as though it had been examined, so a clean report over a tree where a quarter of the files were never read looked identical to a genuinely clean project. On the validation corpora the signal was invisible in practice: 3 parse errors among 6,066 findings on ruff, 46 among ~2,900 on superset, and 25-54% of files on real C/C++ projects (#206).
+
+  Pretty output gains one line, printed only when the count is non-zero:
+
+  ```
+  All checks passed.
+  1 file could not be parsed and was NOT analysed.
+  ```
+
+  It is deliberately a **separate line** rather than a clause on the summary, so it reads identically whether or not there were findings. The clean run is the case it exists for.
+
+  The count comes from a new `LintResult.parse_failed` flag, **not** from counting `SAFE000` violations. That distinction is load-bearing: `ignore = ["SAFE000"]` is the documented way to silence parse noise and would have zeroed a counting-based implementation while the coverage gap remained. It also covers a file safelint could not read at all, which ran no rules either. A file that was excluded, or whose language is not registered, is **not** counted: nothing was attempted for it, so it is not lost coverage. That is why the field is `parse_failed` (default `False`) rather than a `parsed` flag defaulting `True`, which would have claimed a successful parse for files never opened.
+
+- **`--format json` reports per-language file counts and splits analysed from checked (#175, #196).** Three new `summary` keys:
+
+  | Key | Meaning |
+  |---|---|
+  | `files_analysed` | `files_checked - files_skipped`, the number that rules actually ran against. **This is the coverage number.** |
+  | `files_skipped` | Files reached but not analysed. |
+  | `files_checked_by_language` | Sparse `{language: count}` map keyed by the names `--language` accepts. |
+
+  `files_checked` keeps its existing meaning (everything reached), so no consumer breaks. The per-language map is derived from the language registry via `get_language_for_file`, so all nine languages are covered with no per-language branching and a tenth would be too. It is sparse by choice: a language that contributed nothing is absent rather than present with a zero, so "absent means none read" is unambiguous.
+
+  This closes the false-clean route the validation harness works around by re-deriving safelint's own discovery rules in a second model, which is where five earlier defects came from (#192). A consumer can now distinguish "no findings in your Go" from "no Go was read".
+
+  **SARIF deliberately does not carry these.** It has no natural home for run-level counts, and a `properties` bag entry would be a safelint-specific extension no SARIF consumer reads; the parse failures are still present there as ordinary `SAFE000` results. `format_json` / `format_sarif` take them as one optional `coverage=` argument of the new exported `safelint.formatters.RunCoverage` type, which keeps their existing public signature intact.
+
+  **Bundled skill content changed: run `safelint skill install --force`.** All 14 client files gained the new summary keys and, more importantly, an instruction not to report a clean run without checking `files_skipped` first. Their example headline `Clean run: 12 files checked, no violations.` was itself the false-clean claim this issue is about, and now reads `files analysed` with a second variant for when files were skipped.
+
 ## [2.17.2] - 2026-11-07
 
 ### Changed
