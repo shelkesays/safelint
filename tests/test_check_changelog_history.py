@@ -76,6 +76,18 @@ def repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _has_branch(repo: Path, name: str) -> bool:
+    """True when *name* is a branch in *repo*."""
+    done = subprocess.run(["git", "rev-parse", "--verify", name], cwd=repo, capture_output=True, check=False)
+    return done.returncode == 0
+
+
+def _current_branch(repo: Path) -> str:
+    """Return *repo*'s current branch name."""
+    done = subprocess.run(["git", "branch", "--show-current"], cwd=repo, capture_output=True, text=True, check=True)
+    return done.stdout.strip()
+
+
 def _run(script: ModuleType, repo: Path, base: str = "HEAD") -> int:
     """Run the checker inside *repo* and return its exit status."""
     cwd = Path.cwd()
@@ -212,3 +224,78 @@ def test_a_missing_changelog_cannot_tell(repo: Path) -> None:
     (repo / "CHANGELOG.md").unlink()
 
     assert _run(_load_script(), repo) == 2
+
+
+# ── #280 review: three holes in the guard itself ─────────────────────────────
+
+
+def test_a_release_landing_on_the_base_does_not_fail_a_valid_branch(repo: Path) -> None:
+    """The worst of the three: valid PRs would have been blocked, misleadingly.
+
+    Comparing against the base **tip** meant that when a release landed on the
+    base while a branch was open, the base gained a dated section the branch
+    had never seen - and the deleted-section check reported the branch as
+    having *lost published notes*. Both wrong and actively misleading: the
+    branch is merely out of date. Comparing against the merge base fixes it,
+    because that is the newest state the branch actually diverged from.
+    """
+    _git(repo, "checkout", "-qb", "feature")
+    path = repo / "CHANGELOG.md"
+    path.write_text(_RELEASED.replace("## [Unreleased]\n", "## [Unreleased]\n\n### Fixed\n\n- **My work.**\n"), encoding="utf-8")
+    _git(repo, "commit", "-qam", "feature work")
+
+    # meanwhile a release dates [Unreleased] on the base branch
+    _git(repo, "checkout", "-q", "master" if _has_branch(repo, "master") else "main")
+    path.write_text(_RELEASED.replace("## [Unreleased]", "## [Unreleased]\n\n## [2.19.0] - 2026-12-01\n\n### Added\n\n- **Released since.**", 1), encoding="utf-8")
+    _git(repo, "commit", "-qam", "release 2.19.0")
+    base = _current_branch(repo)
+    _git(repo, "checkout", "-q", "feature")
+
+    assert _run(_load_script(), repo, base=base) == 0
+
+
+def test_a_duplicate_release_heading_is_refused(repo: Path) -> None:
+    """A duplicate hides an edit to the earlier copy, so it is refused outright.
+
+    Both headings collapse to one dict key and the LAST copy wins, so an edited
+    first copy compares equal to the base and passes. A changelog has no
+    legitimate duplicate release heading.
+    """
+    path = repo / "CHANGELOG.md"
+    path.write_text(
+        _RELEASED.replace(
+            "## [2.17.2] - 2026-11-07\n\n### Fixed\n\n- **An older fix.** Body text.",
+            "## [2.17.2] - 2026-11-07\n\n### Fixed\n\n- **EDITED after release.** Body text.\n\n## [2.17.2] - 2026-11-07\n\n### Fixed\n\n- **An older fix.** Body text.",
+        ),
+        encoding="utf-8",
+    )
+
+    assert _run(_load_script(), repo) == 1
+
+
+def test_the_duplicate_message_names_the_version(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Refusing without saying which heading repeats is not actionable."""
+    path = repo / "CHANGELOG.md"
+    path.write_text(_RELEASED + "\n## [2.17.2] - 2026-11-07\n\n### Fixed\n\n- **dup.**\n", encoding="utf-8")
+
+    status = _run(_load_script(), repo)
+    err = capsys.readouterr().err
+
+    assert status == 1
+    assert "duplicate release heading" in err
+    assert "2.17.2" in err
+
+
+def test_an_undecodable_base_blob_cannot_tell_rather_than_crashing(repo: Path) -> None:
+    """``text=True`` decoded and raised; the contract promises exit 2 or a verdict.
+
+    The base is read with a replacement decode now, so an invalid blob yields a
+    comparison rather than a traceback. Either outcome is acceptable here - what
+    is not is an unhandled ``UnicodeDecodeError`` escaping the checker.
+    """
+    path = repo / "CHANGELOG.md"
+    path.write_bytes(_RELEASED.encode() + b"\xff\xfe")
+    _git(repo, "commit", "-qam", "undecodable base")
+    path.write_text(_RELEASED, encoding="utf-8")
+
+    assert _run(_load_script(), repo) in (0, 1)
