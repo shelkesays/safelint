@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.17.1] - 2026-11-07
+
 ### Fixed
 
 - **SAFE801 `tainted_sink`: a binding's taint is scoped to the block that declares it (#250).** Every tracker kept one flat `name -> status` map per function, so a nested block that rebound a name overwrote the function-wide entry and the outer binding came back without its taint:
@@ -1682,7 +1684,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.17.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.17.1...HEAD
+[2.17.1]: https://github.com/shelkesays/safelint/compare/v2.17.0...v2.17.1
 [2.17.0]: https://github.com/shelkesays/safelint/compare/v2.16.0...v2.17.0
 [2.16.0]: https://github.com/shelkesays/safelint/compare/v2.15.0...v2.16.0
 [2.15.0]: https://github.com/shelkesays/safelint/compare/v2.14.3...v2.15.0
