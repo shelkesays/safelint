@@ -57,7 +57,7 @@ _JS_BRANCHING_TYPES = frozenset(
         _js.FOR_IN_STATEMENT,  # also covers ``for...of`` in tree-sitter-javascript
         _js.WHILE_STATEMENT,
         _js.DO_STATEMENT,
-        _js.SWITCH_CASE,
+        _js.SWITCH_STATEMENT,
         _js.CATCH_CLAUSE,
         _js.TERNARY_EXPRESSION,
     }
@@ -69,8 +69,7 @@ _JAVA_BRANCHING_TYPES = frozenset(
         _java.ENHANCED_FOR_STATEMENT,
         _java.WHILE_STATEMENT,
         _java.DO_STATEMENT,
-        _java.SWITCH_BLOCK_STATEMENT_GROUP,  # colon-form ``case X: stmt;``
-        _java.SWITCH_RULE,  # arrow-form ``case X -> stmt;`` (Java 14+)
+        _java.SWITCH_EXPRESSION,  # covers the colon and arrow forms alike
         _java.CATCH_CLAUSE,
         _java.TERNARY_EXPRESSION,
     }
@@ -91,7 +90,7 @@ _RUST_BRANCHING_TYPES = frozenset(
         _rust.FOR_EXPRESSION,
         _rust.WHILE_EXPRESSION,
         _rust.LOOP_EXPRESSION,
-        _rust.MATCH_ARM,
+        _rust.MATCH_EXPRESSION,
         _rust.TRY_EXPRESSION,
     }
 )
@@ -107,9 +106,9 @@ _GO_BRANCHING_TYPES = frozenset(
     {
         _go.IF_STATEMENT,
         _go.FOR_STATEMENT,
-        _go.EXPRESSION_CASE,
-        _go.TYPE_CASE,
-        _go.COMMUNICATION_CASE,
+        _go.EXPRESSION_SWITCH_STATEMENT,
+        _go.TYPE_SWITCH_STATEMENT,
+        _go.SELECT_STATEMENT,
     }
 )
 # PHP: ``if_statement`` plus ``else_if_clause`` (PHP's ``elseif`` is a
@@ -130,8 +129,8 @@ _PHP_BRANCHING_TYPES = frozenset(
         _php.DO_STATEMENT,
         _php.FOR_STATEMENT,
         _php.FOREACH_STATEMENT,
-        _php.CASE_STATEMENT,
-        _php.MATCH_CONDITIONAL_EXPRESSION,
+        _php.SWITCH_STATEMENT,
+        _php.MATCH_EXPRESSION,
         _php.CATCH_CLAUSE,
         _php.CONDITIONAL_EXPRESSION,
     }
@@ -148,17 +147,62 @@ _C_BRANCHING_TYPES = frozenset(
         _c.WHILE_STATEMENT,
         _c.DO_STATEMENT,
         _c.FOR_STATEMENT,
-        _c.CASE_STATEMENT,
+        _c.SWITCH_STATEMENT,
         _c.CONDITIONAL_EXPRESSION,
     }
 )
 # C++: the C set plus ``catch_clause`` (each ``catch`` is a branch).
 _CPP_BRANCHING_TYPES = _C_BRANCHING_TYPES | frozenset({_cpp.CATCH_CLAUSE, _cpp.FOR_RANGE_LOOP})
+#: A ``match`` / ``switch`` construct counts ONCE (see the note above), but an
+#: arm carrying a **guard** is a genuine extra decision: ``case X if cond`` can
+#: fall through to a later arm, so the compiler's exhaustiveness proof does not
+#: cover it and the reader has to follow a real condition.
+#:
+#: Two languages need an entry here, and they expose the guard differently,
+#: which is why this is a table rather than one check:
+#:
+#: * Rust - the guard sits on ``match_pattern`` as the ``condition`` FIELD.
+#: * Java 21 - on ``switch_label`` as a child of TYPE ``guard``, with no field
+#:   name, so a field lookup finds nothing.
+#:
+#: **Python is deliberately absent.** Its guard parses to an ``if_clause``,
+#: which is already in the Python branching set (it is the same node type as a
+#: comprehension ``if``), so the branch walk counts it on its own. Adding an
+#: entry here counted it twice: ``case 1 if x > 0`` scored 4 instead of 3.
+#:
+#: Go's ``case``, PHP's ``match`` arms and C's ``case`` have no guard form at
+#: all; they are value comparisons, so they are absent by design.
+_GUARDED_ARM_BY_LANG: dict[str, tuple[str, str | None, str | None]] = {
+    "java": (_java.SWITCH_LABEL, None, _java.GUARD),
+    "rust": (_rust.MATCH_PATTERN, "condition", None),
+}
+
+
+def _arm_guard_count(func_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str]) -> int:
+    """Return the number of guarded ``match`` / ``switch`` arms in *func_node*.
+
+    Nested functions are skipped for the same reason the branch walk skips
+    them: their branches are scored against their own definition.
+    """
+    spec = _GUARDED_ARM_BY_LANG.get(lang_name)
+    if spec is None:
+        return 0
+    arm_type, field, child_type = spec
+    count = 0
+    for node in walk(func_node, skip_types=tuple(function_types)):
+        if node.type != arm_type:
+            continue
+        if (field is not None and node.child_by_field_name(field) is not None) or (child_type is not None and any(c.type == child_type for c in node.children)):
+            count += 1
+    return count
+
+
 _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset(
         {
             _py.IF_STATEMENT,
             _py.ELIF_CLAUSE,
+            _py.MATCH_STATEMENT,
             _py.FOR_STATEMENT,
             _py.WHILE_STATEMENT,
             _py.EXCEPT_CLAUSE,
@@ -264,7 +308,7 @@ class ComplexityRule(BaseRule):
         for node in walk(func_node, skip_types=tuple(function_types)):
             if _is_branch_node(node, lang_name, branching_types):
                 complexity += 1
-        return complexity
+        return complexity + _arm_guard_count(func_node, lang_name, function_types)
 
 
 def _is_branch_node(node: tree_sitter.Node, lang_name: str, branching_types: frozenset[str]) -> bool:

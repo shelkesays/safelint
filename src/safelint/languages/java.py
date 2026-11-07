@@ -143,6 +143,11 @@ SWITCH_EXPRESSION = "switch_expression"  # Java 14+ unified switch (both stateme
 SWITCH_BLOCK = "switch_block"
 SWITCH_BLOCK_STATEMENT_GROUP = "switch_block_statement_group"
 SWITCH_RULE = "switch_rule"  # arrow-form switch case (``case X -> ...``)
+#: The ``case <pattern>`` label itself. A Java 21 ``when`` guard appears as a
+#: child of TYPE ``guard`` here rather than as a named field, which is why the
+#: guard check looks for the child type and not a field.
+SWITCH_LABEL = "switch_label"
+GUARD = "guard"  # ``when <cond>`` on a pattern label (Java 21+)
 TRY_STATEMENT = "try_statement"
 TRY_WITH_RESOURCES_STATEMENT = "try_with_resources_statement"
 CATCH_CLAUSE = "catch_clause"

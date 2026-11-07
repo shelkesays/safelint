@@ -61,7 +61,7 @@ Tracked as issue #206.
 | SAFE101 | function_length | Source lines on `function_definition`. Default cap 60. |
 | SAFE102 | nesting_depth | Counts `if` / `for` / `while` / `do` / `switch`. Default max 2. `goto` labels are flat, not nesting. |
 | SAFE103 | max_arguments | Counts `parameter_declaration` nodes (under `function_declarator.parameters`). `int f(void)` is zero args. Default cap 7. |
-| SAFE104 | complexity | Every `if` / `for` / `while` / `do` / `case` / ternary adds one; `&&` / `\|\|` each add one. Default cap 10. |
+| SAFE104 | complexity | Every `if` / `for` / `while` / `do` / ternary adds one; `&&` / `\|\|` each add one. Default cap 10. A `match` / `switch` counts **once** for the whole construct, not once per arm (#181); a guarded arm adds one more where the language has guards. |
 | SAFE105 | no_recursion | Flags a `function_definition` calling its own name directly. Name resolved from `declarator.declarator`. Enabled by default at warning severity. |
 | SAFE106 | nonlocal_jumps | *C / C++ (rule 1, literal).* Every `goto` and every `setjmp` / `longjmp` / `sigsetjmp` / `siglongjmp` call. **Enabled at warning severity** (idiomatic `goto err` cleanup surfaces without blocking `--fail-on=error`); annotate sanctioned cleanups with `// nosafe: SAFE106`. Configurable via `nonlocal_jump_calls_c` (C uses its own key; C++ reads `nonlocal_jump_calls_cpp`). |
 | SAFE302 | global_mutation | File-scope mutable `declaration` (a translation-unit-shared binding). `const` / prototypes / `typedef` / `extern` exempt; `static` counts. |

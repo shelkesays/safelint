@@ -234,6 +234,14 @@ max_args = 7
 
 Cyclomatic complexity counts the number of independent paths through a function. It starts at 1 and goes up by 1 for every `if`, `elif`, `for`, `while`, `except`, ternary expression, `and`/`or` operator, and comprehension condition. A score above 10 means the function has too many possible paths to test reliably.
 
+**A `match` / `switch` construct adds one, not one per arm.** *(Since 2.18.0; see [#181](https://github.com/shelkesays/safelint/issues/181).)* McCabe measures hand-written control flow, and a dispatch table is not that: the arms are value comparisons, or in Rust a compiler-checked exhaustive match, with no fall-through and no ordering dependency. Adding a variant is a compile error rather than a silent gap, so a twenty-arm lookup carries a cognitive load nearer 1 than 20.
+
+Counting each arm made dispatch tables the dominant finding on real code. Measured across two large Rust projects: `match_arm` alone was 50% of every counted decision point in [astral-sh/ty](https://github.com/astral-sh/ty), and **54% of [ruff](https://github.com/astral-sh/ruff)'s 656 SAFE104 findings fell to at or under the threshold** once arms stopped counting individually, every one of them a lookup table where "split into smaller functions" was not applicable advice.
+
+An arm carrying a **guard** still adds one, because a guard can fall through to a later arm: exhaustiveness proves nothing about it and the reader has to follow a real condition. That applies to Rust (`n if cond =>`), Java 21 pattern guards (`case Integer i when i > 0`) and Python (`case X if cond`, counted as the ordinary `if_clause` it parses to). Go, PHP and C arms are value comparisons with no guard form.
+
+This applies uniformly to all nine languages. Before 2.18.0 the behaviour was inconsistent in both directions: Rust, Go, Java, JavaScript, PHP and C counted every arm, while **Python counted its `match` as nothing at all**, so the same dispatch table scored 0 in one language and N in another. Python now counts the construct like everywhere else, which makes it marginally stricter.
+
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
