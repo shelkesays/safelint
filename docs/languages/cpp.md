@@ -33,9 +33,11 @@ Measured on stock defaults, counting every file in the project (including the `.
 
 Headers fare worst, and for a header-only or header-heavy library that is most of the code: both projects above fail more headers than translation units. The two C projects measured alongside them come out lower (curl 25%, redis 42%), so C++ is the worse case, not the better one.
 
-Note that a C++ project's `.h` files lint as **C**, per the header-ownership limitation above, so they carry the C `SAFE000` wording rather than the C++ one.
+The `.h` rows above assume **both** grammars are installed (`pip install 'safelint[c,cpp]'`). `.h` belongs to the C language definition, so a `safelint[cpp]`-only install does not read those headers at all: they are never discovered or parsed, and they contribute no `SAFE000`. What you get instead is a `pip install 'safelint[c]'` hint on stderr, so the effect is a smaller finding count on the same tree, not better coverage.
 
-The causes, the per-error-kind breakdown, and what you can do about it are on the [C page](c.md#parse-coverage-the-preprocessor-limit); they are identical for both languages. Tracked as [#206](https://github.com/shelkesays/safelint/issues/206).
+Those headers also lint as **C**, per the header-ownership limitation above, so their parse errors carry the C `SAFE000` wording rather than the C++ one.
+
+The causes, the per-error-kind breakdown, and what you can do about it are on the [C page](c.md#parse-coverage-the-preprocessor-limit). They are *nearly* identical for both languages, with one C++-only addition: because `.h` is parsed as C, C++ syntax in such a header (a `namespace`, a `template`, a base-class list) defeats the C grammar on its own, and no amount of preprocessing changes that. Measured on fmt, it is the minority cause: re-running its 24 failing `.h` headers under the C++ grammar leaves 20 of them still failing on macro or directive shapes, and clears only 4. Renaming those headers to `.hpp` / `.hxx` / `.hh` is what recovers the 4. Tracked as [#206](https://github.com/shelkesays/safelint/issues/206).
 
 ## Suppression directives
 
