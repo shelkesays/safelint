@@ -30,6 +30,17 @@ class LanguageDefinition:
     #: NOT the user's mistake, so the default message would misattribute
     #: blame; ``None`` keeps the generic wording.
     parse_error_hint: str | None = None
+    #: Inspects the parsed tree and returns advice for a **specific recognised
+    #: cause**, or ``None`` when it does not recognise one. Takes precedence
+    #: over ``parse_error_hint``, which is per-language and therefore
+    #: unconditional.
+    #:
+    #: This is for a language where most parse failures ARE the user's mistake,
+    #: so a blanket hint would be wrong, but one construct is known to defeat
+    #: the grammar: Rust's ``str!`` / ``i32!`` macros, where the name is a
+    #: primitive type keyword (#174). Blaming the user's syntax there sends
+    #: them debugging correct code.
+    parse_error_cause: Callable[[tree_sitter.Node], str | None] | None = None
 
 
 def preprocessor_parse_hint(display_name: str) -> str:

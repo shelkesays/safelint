@@ -38,6 +38,18 @@ safelint lints `.rs` files. The skill doesn't need to filter by extension - `saf
 
 Rust is in scope for the cross-language rules (SAFE101-105, SAFE303-304, SAFE501, SAFE601, SAFE603, SAFE701-702, SAFE801-803) plus the Rust-specific rules (SAFE110, SAFE112, SAFE204-208, SAFE306, SAFE307, SAFE308, SAFE602). New in 2.4.0: SAFE105 `no_recursion` (enabled by default), SAFE307 `interior_mutable_static` and SAFE603 `blanket_suppression` (disabled by default). The rules deliberately skipped for Rust (SAFE201, SAFE202, SAFE203, SAFE301, SAFE302, SAFE309, SAFE401) are listed in the "Deliberately skipped" section below.
 
+## A `str!` / `i32!` macro loses the whole file
+
+`tree-sitter-rust` cannot parse a macro whose name is a primitive type keyword (`str![[...]]` - snapbox's inline-snapshot macro - and likewise `i32!`, `bool!`, `u8!`). The file gets a `SAFE000` and **no rule runs against it**.
+
+When acting on a report:
+
+- **Do not rewrite the source to satisfy the parser.** The code is valid Rust; the limitation is upstream in the grammar (still present in tree-sitter-rust 0.24.2, the latest release). The `SAFE000` message says so for this shape rather than telling you to check syntax.
+- **Check the `SAFE000` count before calling a Rust project clean.** A silently skipped file looks identical to a clean one. On ruff, 3 skipped files sat among 6,066 findings.
+- A genuine Rust syntax error still reads as "check syntax near this location", so the two are distinguishable from the message alone.
+
+Tracked as issue #174.
+
 ## Macros vs function calls
 
 The biggest Rust-vs-other-languages shape difference safelint contends with: **Rust I/O entry points are mostly macros** (`println!`, `eprintln!`, `write!`, `writeln!`, `dbg!`), not function calls. The rule engine walks both `call_expression` and `macro_invocation` nodes for SAFE303 / SAFE304, with the same configured `io_functions_rust` list applying to both. Violation messages render macros with the trailing `!` (e.g. `println!`) so you can tell at a glance which form fired.

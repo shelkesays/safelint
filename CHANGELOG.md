@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **SAFE000 on a Rust `str!` / `i32!` macro now names the real cause instead of blaming your syntax (#174).** `tree-sitter-rust` cannot parse a macro whose name is a primitive type keyword: the lexer resolves the word as a type token before it can be a macro identifier, and `<primitive> !` is not a valid invocation in the grammar. The file gets a `SAFE000` and **every rule reports nothing for it** - worse than a false positive, because a false positive is visible and suppressible while this silently removes a file from analysis. Found on ruff, where 3 affected files sat among 6,066 findings.
+
+  Not obscure: `str!` is [snapbox](https://docs.rs/snapbox)'s inline-snapshot macro, so any crate using inline snapshots loses those files. Still unfixable by a dependency bump, which was checked rather than assumed: `tree-sitter-rust` 0.24.2 remains the latest release on PyPI and still fails.
+
+  So the message changed, not the parsing:
+
+  ```
+  SAFE000 Parse error (syntax error) at line 2, column 23 - a macro named after a
+  primitive type (such as snapbox's `str!`) cannot be parsed by tree-sitter-rust, so
+  this file was NOT analysed; the code itself is valid Rust and there is nothing here to fix
+  ```
+
+  **This is per-cause, not per-language, which is the distinction 2.17.2 explicitly could not make.** C and C++ carry an unconditional `parse_error_hint` because a parse failure there is routinely the preprocessor's doing. Rust cannot: most Rust parse failures genuinely are the user's mistake, so a blanket hint would excuse real errors. `LanguageDefinition` therefore gained `parse_error_cause`, a hook that inspects the tree and recognises one specific construct, and the advice now resolves in three tiers: recognised cause, then the language's blanket hint, then the generic "check syntax".
+
+  Detection covers all three delimiter forms, which recover differently (`str![1]` and `str!(1)` leave the bare `!` as the error with the name beside it; `str!{1}` puts the name *in* the error node), and every primitive name. The opposite error - telling someone their broken code is fine - is what most of the new tests guard: an unbalanced paren, a missing semicolon, a stray brace, an unclosed string and a genuinely broken non-primitive macro all still get the generic advice, and `string!` / `i32x4!` are ordinary identifiers that parse fine.
+
+  Documented in `docs/languages/rust.md` under Limitations, and in the bundled Rust skill addendum, which tells an agent not to rewrite valid source to satisfy the parser and to count `SAFE000` before calling a Rust project clean. **Bundled skill content changed: run `safelint skill install --force`.**
+
 ## [2.18.0] - 2026-11-07
 
 ### Added

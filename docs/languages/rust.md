@@ -182,5 +182,19 @@ Documented gaps in the Rust port; users should be aware these patterns aren't ca
 
 * **Framework presets.** axum / actix-web / rocket / warp (web frameworks) and tokio / async-std (async runtimes) don't have dedicated SafeLint presets yet. Rule defaults assume vanilla stdlib; framework-specific patterns (axum's `IntoResponse`, actix's `web::Json` validation) would land in a future preset analogous to the Java `spring-boot` framework knob. Track via [GitHub issues](https://github.com/shelkesays/safelint/issues).
 * **`unsafe fn` declarations.** SAFE602 covers `unsafe { ... }` blocks but not `unsafe fn` items. The latter requires `/// # Safety` doc-comment detection, a separate convention; a future rule may extend this.
+* **A macro named after a primitive type is unparseable, and the whole file is lost.** `str![[...]]`, `i32!(...)`, `bool!{...}` and the rest fail in `tree-sitter-rust`: the lexer resolves the word as a type token before it can be a macro identifier, and `<primitive> !` is not a valid invocation in the grammar. The file gets a `SAFE000` and **every rule reports nothing for it**, which is worse than a false positive - a false positive is visible and suppressible, this silently removes a file from analysis.
+
+  This is not obscure. `str!` is [snapbox](https://docs.rs/snapbox)'s inline-snapshot macro, so any crate using inline snapshots loses those files. Found on [ruff](https://github.com/astral-sh/ruff), where 3 affected files sat among 6,066 findings; nobody would have noticed.
+
+  Upstream, not safelint's own parsing: `tree-sitter-rust` 0.24.2 is the latest release on PyPI and still fails, so it cannot be fixed by a dependency bump today. What safelint does control is the message, so *since 2.18.1* the `SAFE000` for this shape names the cause instead of advising you to check syntax:
+
+  ```
+  SAFE000 Parse error (syntax error) at line 2, column 23 - a macro named after a
+  primitive type (such as snapbox's `str!`) cannot be parsed by tree-sitter-rust, so
+  this file was NOT analysed; the code itself is valid Rust and there is nothing here to fix
+  ```
+
+  Detection is per-cause and narrow: a genuine Rust syntax error still gets the generic "check syntax" advice. Count your `SAFE000` findings before reading a clean Rust run as a clean project. Tracked as [#174](https://github.com/shelkesays/safelint/issues/174).
+
 * **Macro-based taint-flow sinks.** SAFE801 walks `call_expression` only; `sqlx::query!("SELECT ...")` (compile-time-checked SQL macros) and similar token-tree-based macros aren't currently modelled. Real SQL injection in those forms requires careful raw-string assembly which the current rule set won't catch. Use `sqlx::query` (the function form) with parameter binding for safelint coverage.
 * **Type-inference-dependent rules.** SAFE112 sees parameter annotations but doesn't track locally-bound types; arithmetic on a local that derives from a parameter won't fire. `cargo clippy` covers the full-type-inference version (`clippy::arithmetic_side_effects`).
