@@ -26,6 +26,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from safelint.core import engine
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
 from safelint.rules._test_files import _path_components_contain
@@ -152,3 +153,48 @@ def test_coupling_stays_quiet_when_the_paired_test_also_changed(tmp_path: Path, 
     result = _coupling_engine([str(source), str(paired)]).check_file(str(source))
 
     assert result.violations == []
+
+
+# ── exclude patterns with Windows separators (found by the new Windows CI job) ──
+
+
+def test_exclude_pattern_separators_are_folded_on_windows_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Both platform branches asserted from one host.
+
+    Exclusion matches an ``as_posix()`` path against the raw pattern, so a
+    pattern carrying backslashes - what ``str(Path(...))`` produces, and what a
+    Windows user naturally writes - could never match and the exclusion
+    silently did nothing. Folding is Windows-only because a backslash is a
+    legitimate escape character in a POSIX glob.
+    """
+    pattern = r"C:\vendor\**"
+
+    monkeypatch.setattr(engine, "_IS_WINDOWS", False)
+    assert engine._normalise_exclude_pattern(pattern) == pattern  # POSIX: untouched
+
+    monkeypatch.setattr(engine, "_IS_WINDOWS", True)
+    assert engine._normalise_exclude_pattern(pattern) == "C:/vendor/**"
+
+
+def test_a_posix_pattern_is_unchanged_by_folding(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A forward-slash pattern must survive the Windows branch untouched."""
+    monkeypatch.setattr(engine, "_IS_WINDOWS", True)
+
+    assert engine._normalise_exclude_pattern("vendor/**") == "vendor/**"
+
+
+def test_an_absolute_exclude_path_actually_excludes_the_file(tmp_path: Path) -> None:
+    """End to end, on whichever platform is running.
+
+    ``extend_exclude_paths=[str(path)]`` is the documented form, and on Windows
+    ``str`` yields backslashes. Before the fix this file was linted and reported
+    violations despite being excluded; the Windows CI job is what surfaced it.
+    """
+    sample = tmp_path / "skip_me.py"
+    sample.write_text("def f():\n    if True:\n        if True:\n            if True:\n                pass\n", encoding="utf-8")
+    config = deep_merge(DEFAULTS, {"extend_exclude_paths": [str(sample)]})
+
+    result = SafetyEngine(config).check_file(str(sample))
+
+    assert result.violations == []
+    assert result.suppressed == []
