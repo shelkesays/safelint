@@ -61,6 +61,37 @@ jobs:
         run: |
           uv run safelint check src/ scripts/ tests/ --all-files --fail-on=warning
 
+  changelog-history:
+    # Refuses a change that edits the notes of an already-released version
+    # (#278). The failure it catches is silent: a rebase across a release
+    # merges a branch's `[Unreleased]` entries into the dated section without
+    # conflicting, because the subsection headings match either side. That
+    # happened four times in one day and every instance was caught by hand.
+    #
+    # Pull requests only. On a push there is no base to compare against, and
+    # the release workflow legitimately rewrites `[Unreleased]` into a dated
+    # section as it tags.
+    name: CHANGELOG history
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # The base branch has to be reachable for `git show <base>:CHANGELOG.md`,
+          # and a shallow clone does not contain it.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+        with:
+          python-version: "3.12"
+
+      - name: Released CHANGELOG sections are unchanged
+        run: |
+          git fetch --quiet origin "${{ github.base_ref }}"
+          uv run --no-project python scripts/check_changelog_history.py \
+            --base-ref "origin/${{ github.base_ref }}"
+
   test:
     name: Test / ${{ matrix.label }}
     runs-on: ${{ matrix.os }}

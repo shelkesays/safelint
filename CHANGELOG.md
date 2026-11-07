@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **CI refuses a change that edits the notes of an already-released version (#278).** Rebasing a feature branch across a release silently rewrites published release notes, and it **never conflicts**, so nothing asks. A branch's entries sit under `## [Unreleased]` -> `### Fixed`; the release workflow renames that heading to `## [X.Y.Z] - <date>` and inserts a fresh empty `[Unreleased]`; a later rebase sees `### Fixed` either side with identical surrounding context and merges the entries into the **dated** section.
+
+  That happened four times in a single day - on the branches for #266, #270, #275 and #276 - and every instance was caught only by diffing the dated sections by hand afterwards. Nothing in the gate could see it: the rebase reported success, the suite passed, and `mkdocs build --strict` passed. Had one merged, a tagged release on PyPI would have grown notes describing work it did not contain.
+
+  `scripts/check_changelog_history.py` now asserts that every dated section present in **both** the base branch and the head is byte-identical, including the compare-link footers (those were corrupted once by the same mechanism). Adding a *new* dated section stays allowed, because that is what the release workflow does, and `[Unreleased]` stays freely editable. It runs as a `CHANGELOG history` job on pull requests only, since a push has no base to compare against.
+
+  Three exit states rather than two, deliberately: 0 intact, 1 a released section was edited, and **2 "could not tell"** (an unreadable base ref). Collapsing the third into 0 would let a misconfigured job silently stop guarding, which is the exact failure mode the check exists to remove.
+
 ### Fixed
 
 - **SAFE302 reports a Go package-level `var` only when it is actually mutated (#204).** The rule fired on every package-level `var`, which reported a *construct* rather than the hazard it names. Go's `const` accepts only compile-time basic values, so a package-level slice, map, struct or `-ldflags`-written string **cannot** be a `const`: the rule was flagging an idiom with no alternative. Measured on fzf, 120 findings with 97% in library code, the largest non-structural default code in the project.
