@@ -390,6 +390,40 @@ class _RunCounts:
 _EMPTY_RUN_COUNTS = _RunCounts()
 
 
+def _print_pretty_results(
+    violations: list[Violation],
+    suppressed: list[Violation],
+    *,
+    blocking_count: int,
+    fail_on: str,
+    counts: _RunCounts,
+    options: _PrintOptions,
+) -> None:
+    """Emit the pretty-mode summary block (per-file violations already streamed).
+
+    A clean run under ``silent_on_clean`` emits nothing - summary AND the
+    ``--statistics`` table (the hook parser accepts ``--statistics``, so this
+    gate is what keeps a clean pre-commit batch quiet - issue #50).
+    """
+    emit = bool(violations) or not options.silent_on_clean
+    if emit:
+        _print_summary(violations, blocking_count, fail_on, suppressed, counts.coverage.files_skipped)
+    elif counts.coverage.files_skipped:
+        # Lost coverage breaks the clean-run silence, but only this one line. A
+        # hook / stdin run with ``ignore = ["SAFE000"]`` has no violations, so
+        # the branch above never fires and the gap would be invisible in the
+        # place it matters most: the gate that lets the commit through.
+        #
+        # This does not reopen issue #50. That was about *aggregate* counts
+        # being misleading when pre-commit batches files across several hook
+        # invocations, each printing its own partial total. A parse failure is a
+        # per-file fact, so one line per batch naming what *that* batch could
+        # not analyse is accurate rather than partial.
+        print(_make_skipped_line(counts.coverage.files_skipped))
+    if options.statistics and emit:
+        _print_statistics(violations, suppressed)
+
+
 def _print_results(
     output_format: str,
     violations: list[Violation],
@@ -414,7 +448,10 @@ def _print_results(
       ``(N suppressed)`` breakdown or the stats table per batch produces a
       stack of misleading *partial*-count lines (issue #50). The summed
       breakdown stays available via ``safelint check`` (which leaves this
-      False) and in every JSON / SARIF document.
+      False) and in every JSON / SARIF document. **One exception**: a non-zero
+      skipped-file count still prints its single line, because silence there
+      would hide lost coverage at the gate that lets a commit through, and a
+      parse failure is a per-file fact rather than a partial aggregate.
     * ``statistics`` - when True, append a per-rule violation-count table
       after the summary. Pretty mode only; gated by the same clean-run
       silence above.
@@ -422,14 +459,7 @@ def _print_results(
     Stderr diagnostics are unaffected - always written as produced.
     """
     if output_format == "pretty":
-        # A clean run under ``silent_on_clean`` emits nothing - summary AND
-        # the ``--statistics`` table (the hook parser accepts ``--statistics``,
-        # so this gate is what keeps a clean pre-commit batch quiet - issue #50).
-        emit = bool(violations) or not options.silent_on_clean
-        if emit:
-            _print_summary(violations, blocking_count, fail_on, suppressed, counts.coverage.files_skipped)
-        if options.statistics and emit:
-            _print_statistics(violations, suppressed)
+        _print_pretty_results(violations, suppressed, blocking_count=blocking_count, fail_on=fail_on, counts=counts, options=options)
         return
     # output_format is "json" or "sarif" here - argparse ``choices`` guarantees
     # it, and "pretty" already returned above. Both formatters share the same
