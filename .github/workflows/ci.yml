@@ -62,13 +62,40 @@ jobs:
           uv run safelint check src/ scripts/ tests/ --all-files --fail-on=warning
 
   test:
-    name: Test / Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    name: Test / ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
     needs: lint
     strategy:
       fail-fast: false
+      # Ubuntu across every supported Python, plus ONE Windows job.
+      #
+      # Windows is here because safelint is full of path handling - test-dir
+      # membership, changed-set matching, symlink containment, drive letters -
+      # and an ubuntu-only matrix structurally cannot see a bug in any of it.
+      # #265 (SAFE702 never firing on Windows while the same commit failed on
+      # Linux CI) went unreproducible for exactly that reason.
+      #
+      # One Windows job rather than four: the bugs this catches are
+      # platform-dependent, not Python-version-dependent, so a second Windows
+      # Python would mostly re-run the same assertions at twice the cost.
+      # 3.12 is the midpoint of the supported range.
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: ubuntu-latest
+            python-version: "3.11"
+            label: Python 3.11
+          - os: ubuntu-latest
+            python-version: "3.12"
+            label: Python 3.12
+          - os: ubuntu-latest
+            python-version: "3.13"
+            label: Python 3.13
+          - os: ubuntu-latest
+            python-version: "3.14"
+            label: Python 3.14
+          - os: windows-latest
+            python-version: "3.12"
+            label: Windows / Python 3.12
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
