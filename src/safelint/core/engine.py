@@ -346,11 +346,21 @@ class LintResult:
     ``suppressed`` is the list of violations that were filtered out by inline
     ``# nosafe`` directives or per-file ignore patterns. Use ``len(...)`` for
     the count and iterate to inspect codes/rules/lines.
+
+    ``parse_failed`` is True when the file could not be turned into a usable
+    tree, so **no rule ran against it**: it was reached but not analysed. It
+    exists because callers cannot infer that from the violation list: a
+    ``SAFE000`` violation disappears under ``ignore = ["SAFE000"]`` while the
+    coverage gap it stood for does not (#175). The default is False on every
+    other path, including a file that was excluded or whose language is not
+    registered, because nothing was attempted for those and they are not lost
+    coverage.
     """
 
     path: str
     violations: list[Violation] = field(default_factory=list)
     suppressed: list[Violation] = field(default_factory=list)
+    parse_failed: bool = False
 
     @property
     def has_violations(self) -> bool:
@@ -614,10 +624,16 @@ class SafetyEngine:
         it becomes a zero-width caret (``column_start == column_end``) on
         ``end_lineno == lineno`` so editors can render a precise marker
         rather than underlining the whole line.
+
+        Every result built here carries ``parse_failed=True``: this is the one
+        constructor for "safelint produced nothing but an error for this file",
+        which covers a tree-sitter parse failure and an unreadable file alike.
+        Both mean no rule ran, which is what the skipped-file count reports.
         """
         end = lineno if column is not None else None
         return LintResult(
             path=filepath,
+            parse_failed=True,
             violations=[
                 Violation(
                     rule="parse",
@@ -845,7 +861,7 @@ class SafetyEngine:
             # Parse errors are emitted by the engine, not by a registered
             # BaseRule, so their suppression is handled here directly.
             if self._engine_internal_ignored("SAFE000", "parse"):
-                return LintResult(path=filepath, violations=[], suppressed=[])
+                return LintResult(path=filepath, violations=[], suppressed=[], parse_failed=True)
             return self._build_parse_error_result(filepath, tree.root_node, lang)
 
         # Single tree walk - produces both line-level ``# nosafe``
