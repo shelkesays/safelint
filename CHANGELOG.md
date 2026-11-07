@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.0] - 2026-11-07
+
 ### Added
 
 - **The run summary now says how many files it could not analyse (#175).** A parse failure removes a file from analysis entirely: one `SAFE000` is emitted and then every rule skips it. The summary counted it in `files_checked` as though it had been examined, so a clean report over a tree where a quarter of the files were never read looked identical to a genuinely clean project. On the validation corpora the signal was invisible in practice: 3 parse errors among 6,066 findings on ruff, 46 among ~2,900 on superset, and 25-54% of files on real C/C++ projects (#206).
@@ -1800,7 +1802,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.17.2...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.18.0...HEAD
+[2.18.0]: https://github.com/shelkesays/safelint/compare/v2.17.2...v2.18.0
 [2.17.2]: https://github.com/shelkesays/safelint/compare/v2.17.1...v2.17.2
 [2.17.1]: https://github.com/shelkesays/safelint/compare/v2.17.0...v2.17.1
 [2.17.0]: https://github.com/shelkesays/safelint/compare/v2.16.0...v2.17.0
