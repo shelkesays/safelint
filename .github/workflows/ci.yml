@@ -87,10 +87,18 @@ jobs:
           python-version: "3.12"
 
       - name: Released CHANGELOG sections are unchanged
+        # The base branch name reaches the shell through the environment, not
+        # through inline `${{ }}` expansion. A branch name can carry shell
+        # metacharacters, and an inline expansion would splice them into the
+        # script before bash ever sees a quote (template injection; zizmor
+        # flags it). Same reason `sync-development.yml` reads `inputs.force`
+        # this way.
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch --quiet origin "${{ github.base_ref }}"
+          git fetch --quiet origin "$BASE_REF"
           uv run --no-project python scripts/check_changelog_history.py \
-            --base-ref "origin/${{ github.base_ref }}"
+            --base-ref "origin/$BASE_REF"
 
   test:
     name: Test / ${{ matrix.label }}
