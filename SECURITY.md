@@ -8,7 +8,7 @@ Security fixes ship to the supported lines below. Lines marked ❌ receive no se
 
 | Version(s) | Status |
 |---|---|
-| **2.18.x** (current; the run summary now reports files it could not analyse and a per-language breakdown (`files_analysed` / `files_skipped` / `files_checked_by_language`), SAFE104 counts a `match` / `switch` once rather than once per arm, and Windows path handling is fixed and now covered by CI) | ✅ Security fixes |
+| **2.18.x** (current; the run summary now reports files it could not analyse and a per-language breakdown (`files_analysed` / `files_skipped` / `files_checked_by_language`), SAFE104 counts a `match` / `switch` once rather than once per arm, and Windows path handling is fixed and now covered by CI; in 2.18.1 SAFE302 reports a Go package-level `var` only when it is actually mutated and SAFE000 names the real cause of a Rust `str!` / `i32!` macro instead of blaming valid syntax) | ✅ Security fixes |
 | **2.17.x** (SAFE601 helper prefixes and callback assertions, function names resolved from their binding, SAFE901 test scoping, in 2.17.1 block-scoped taint plus recursion through a bound function, and in 2.17.2 a SAFE000 parse-error message that names the preprocessor on C and C++ instead of blaming valid code) | ✅ Security fixes |
 | **2.16.x** (SAFE601 test scoping and identity, Go support, SAFE801 evidence wording) | ✅ Security fixes |
 | **2.15.x** (false-positive precision across nine languages) | ✅ Security fixes |
