@@ -11,7 +11,7 @@ name: Sync development with main
 #
 #   1. A CONTENT CHECK can approve the reset outright. If every commit
 #      development has that main lacks is already ON main under a different SHA
-#      (patch-id equivalence, `git cherry`), nothing can be lost and no further
+#      (verbatim patch-id equivalence), nothing can be lost and no further
 #      reasoning is needed. This is the shape a rebase-merged release leaves
 #      behind. It can only ever approve; when it cannot, (2) decides.
 #   2. A VERSION CHECK decides whether development's extra commits were already
@@ -69,8 +69,13 @@ name: Sync development with main
 # settle by hand ever since the guard landed. So the content check runs first
 # and can only APPROVE; when it cannot, the version + tag guard decides as it
 # always did, and a refusal is still a refusal. Verified against the 2.18.0
-# deadlock (11 commits, every one read `-`, which this resets automatically) and
-# against a mutation of that case (one extra local commit, read `+`, refused).
+# deadlock (11 commits, every patch already on main, which this resets
+# automatically) and against a mutation of that case (one extra local commit,
+# refused).
+#
+# The comparison does NOT go through `git cherry`, which strips whitespace and
+# so cannot tell two Python commits differing only in indentation apart; see
+# `patch_ids_in` below.
 #
 # Archiving remains, and is strictly safer than what the patch-id guard did:
 # when that guard PASSED it force-pushed with no backup at all.
@@ -247,41 +252,67 @@ jobs:
             return 0
           }
 
+          # Verbatim patch-ids for every non-merge commit in a range, one per
+          # line.
+          #
+          # `git cherry` is the obvious tool for the comparison below and cannot
+          # be used for it. It computes patch-ids with WHITESPACE STRIPPED,
+          # which is `git patch-id`'s default, and exposes no way to change
+          # that: `patchid.verbatim` in the config does not reach it (verified
+          # on git 2.50). Two commits that differ only in indentation therefore
+          # read as the same patch - and this is a Python project, where
+          # indentation is behaviour. Reproduced: a commit adding two lines
+          # inside an `if` and a commit adding the same two lines after it
+          # share one patch-id by default and `git cherry` prints `-`, so the
+          # reset would have discarded a real difference (CodeAnt on #283).
+          # `--verbatim` tells them apart. It cannot be combined with
+          # `--stable`, which is no loss: `--stable` only fixes file ORDER
+          # within one patch, and both sides here are computed by this same
+          # function.
+          #
+          # Merges are excluded because a merge has no single diff to hash.
+          # That omission is deliberate and the caller's count check is what
+          # turns it into a refusal rather than a silent gap.
+          patch_ids_in() {
+            git log -p --no-merges --format='commit %H' "$1" | git patch-id --verbatim | cut -d' ' -f1
+          }
+
           # Is every commit development has that main lacks ALREADY on main as
           # content, under a different SHA?
           #
-          # This is the `git cherry origin/main origin/development` the refusal
-          # message quotes, run by the workflow instead of by a human. All `-`
-          # means every patch is upstream already, so resetting loses nothing
-          # and the version reasoning below is moot. It is used as a permission
-          # only: a no answer falls through to the version + tag guard rather
-          # than refusing on its own, which is why the 2.15.0 squash (where this
-          # predicate reads every commit as not-upstream) is unaffected.
+          # This is the question the refusal message has been asking people to
+          # settle by hand, answered by the workflow. A yes means resetting
+          # loses nothing and the version reasoning below is moot. It is used as
+          # a permission only: a no falls through to the version + tag guard
+          # rather than refusing on its own, which is why the 2.15.0 squash
+          # (where every commit reads as not-upstream) is unaffected.
           #
           # Two readings are refused rather than trusted:
           #
-          #   * any `+` line - that patch is on main under no SHA at all;
-          #   * fewer lines than $2 - `git cherry` silently OMITS merge commits
-          #     (verified: three commits ahead, one of them a merge, prints two
-          #     lines), and a merge's conflict resolution is content that exists
-          #     in no other commit. An unclassified commit is an unanswered
-          #     question, so it fails closed.
-          #
-          # An empty commit is classified `+` (also verified), so it fails
-          # closed too - the right answer, since patch-id cannot speak for a
-          # commit with no diff.
+          #   * a patch-id not present on main - that commit is on main under no
+          #     SHA at all;
+          #   * fewer comparable patches than $2 - a merge commit or an empty
+          #     commit yields none, and a merge's conflict resolution is content
+          #     that exists in no other commit. An uncompared commit is an
+          #     unanswered question, so it fails closed.
           content_is_upstream() {
-            local cherry lines unmatched
-            if ! cherry=$(git cherry "$MAIN" "$1" 2>/dev/null); then
-              echo "the patch-id comparison could not be run"
+            local base upstream dev_ids classified unmatched pid
+            if ! base=$(git merge-base "$MAIN" "$1" 2>/dev/null); then
+              echo "development and main share no merge base, so their patches cannot be compared"
               return 1
             fi
-            lines=$(printf '%s\n' "$cherry" | grep -c '^[+-] ' || true)
-            if [ "$lines" -ne "$2" ]; then
-              echo "only $lines of $2 commit(s) could be compared by patch-id (git cherry omits merge commits)"
+            upstream=$(patch_ids_in "$base..$MAIN" | sort -u)
+            dev_ids=$(patch_ids_in "$base..$1")
+            classified=$(printf '%s\n' "$dev_ids" | grep -c . || true)
+            if [ "$classified" -ne "$2" ]; then
+              echo "only $classified of $2 commit(s) have a patch to compare (a merge commit or an empty commit has none)"
               return 1
             fi
-            unmatched=$(printf '%s\n' "$cherry" | grep -c '^+ ' || true)
+            unmatched=0
+            while IFS= read -r pid; do
+              [ -n "$pid" ] || continue
+              printf '%s\n' "$upstream" | grep -qxF "$pid" || unmatched=$((unmatched + 1))
+            done <<< "$dev_ids"
             if [ "$unmatched" -ne 0 ]; then
               echo "$unmatched of $2 commit(s) are on main under no SHA"
               return 1
@@ -330,7 +361,7 @@ jobs:
               echo "- nothing was archived or reset; this is the guard against a push to main discarding unshipped work"
               echo "- to sync anyway: land that work on main first, or re-run this workflow with \`force=true\`"
               echo "- \`force\` still archives development's tip to \`archive/development-$2\` before resetting, so it is recoverable"
-              echo "- this run already made that patch-id comparison (\`git cherry origin/main origin/development\`) and it did not clear the reset, so the reason above is the whole story. A squash merge collapses N commits into a single patch-id matching none of them, which is one way a lossless reset still reads unproven"
+              echo "- this run already compared development's patches against main's and it did not clear the reset, so the reason above is the whole story. A squash merge collapses N commits into a single patch-id matching none of them, which is one way a lossless reset still reads unproven. Note \`git cherry\` is NOT the command to check this by hand: it strips whitespace, so it answers a laxer question than this workflow does"
             } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
           }
 
