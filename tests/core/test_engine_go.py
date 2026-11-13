@@ -71,7 +71,9 @@ def test_engine_skips_python_only_rules_on_go(tmp_path: Path) -> None:
 def test_go_nosafe_comment_suppresses_violation(tmp_path: Path) -> None:
     """A ``// nosafe`` directive on the offending line suppresses the violation."""
     sample = tmp_path / "supp.go"
-    sample.write_text("package main\nvar counter int // nosafe: SAFE302\n", encoding="utf-8")
+    # ``counter`` must actually be mutated for SAFE302 to fire at all (#204),
+    # otherwise this would assert suppression of a violation that never happens.
+    sample.write_text("package main\nvar counter int // nosafe: SAFE302\n\nfunc inc() { counter++ }\n", encoding="utf-8")
     result = _engine().check_file(str(sample))
     assert not any(v.code == "SAFE302" for v in result.violations)
     assert any(v.code == "SAFE302" for v in result.suppressed)

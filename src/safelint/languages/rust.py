@@ -73,12 +73,109 @@ def _create_rust_parser() -> tree_sitter.Parser:
     return tree_sitter.Parser(_RUST_TS_LANGUAGE)
 
 
+#: Rust's primitive type names. A macro whose name is one of these defeats
+#: ``tree-sitter-rust``: the lexer resolves the word as a type token before it
+#: can be a macro identifier, and ``<primitive> !`` is not a valid invocation in
+#: the grammar, so the whole FILE gets a ``SAFE000`` and no analysis at all.
+#:
+#: Not obscure in practice: ``str!`` is snapbox's inline-snapshot macro, so any
+#: crate using those loses those files entirely (#174). Confirmed against
+#: tree-sitter-rust 0.24.2, which is still the latest release, so this cannot be
+#: fixed by a dependency bump today.
+_PRIMITIVE_TYPE_NAMES: frozenset[str] = frozenset(
+    {
+        "i8",
+        "i16",
+        "i32",
+        "i64",
+        "i128",
+        "isize",
+        "u8",
+        "u16",
+        "u32",
+        "u64",
+        "u128",
+        "usize",
+        "f32",
+        "f64",
+        "bool",
+        "char",
+        "str",
+    }
+)
+
+_PRIMITIVE_MACRO_ADVICE = (
+    "a macro named after a primitive type (such as snapbox's `str!`) cannot be parsed by tree-sitter-rust, "
+    "so this file was NOT analysed; the code itself is valid Rust and there is nothing here to fix"
+)
+
+
+def primitive_macro_parse_cause(root: tree_sitter.Node) -> str | None:
+    """Return advice if the parse failed on a primitive-named macro, else None.
+
+    The grammar recovers in two shapes, both checked here because the bracket
+    and brace forms differ:
+
+    * ``str![1]`` / ``str!(1)`` - the ``ERROR`` holds the bare ``!`` and its
+      previous sibling is the name;
+    * ``str!{1}`` - the ``ERROR`` holds the name itself.
+
+    Deliberately narrow. A genuine Rust syntax error produces neither shape: a
+    missing token carries empty text, and an unbalanced delimiter puts an
+    unrelated node either side, so this cannot turn a real mistake into "there
+    is nothing here to fix". Verified against both forms of the failure and
+    against a stray-brace and missing-semicolon error.
+
+    **Every** error in the file has to be this shape, not merely one of them.
+    Returning the advice on a first match was wrong in both directions
+    (reported on #275): with a genuine error earlier in the file, ``SAFE000``
+    points at THAT line while the message says there is nothing to fix; with
+    the macro first, the message is right about its own location but still
+    tells the reader a broken file is fine. Saying "nothing here to fix" is
+    only honest when nothing else is broken, so any other error - including a
+    MISSING token, which carries no text - falls back to the generic advice.
+
+    Prunes subtrees with no error, so a mostly-valid file costs one shallow
+    walk rather than a full traversal.
+    """
+    stack = [root]
+    found = False
+    while len(stack) > 0:
+        node = stack.pop()
+        if not node.has_error:
+            continue
+        if not (node.is_missing or node.type == ERROR):
+            stack.extend(node.children)
+            continue
+        if not _is_primitive_macro_error(node):
+            return None
+        found = True
+    return _PRIMITIVE_MACRO_ADVICE if found else None
+
+
+def _is_primitive_macro_error(node: tree_sitter.Node) -> bool:
+    """Return True when *node* is the ``ERROR`` left by ``<primitive>!``."""
+    text = node.text.decode("utf-8", errors="replace") if node.text is not None else ""
+    if text in _PRIMITIVE_TYPE_NAMES:
+        return True  # the ``str!{...}`` shape: the name itself is the error
+    if text != "!":
+        return False
+    previous = node.prev_sibling
+    if previous is None or previous.text is None:
+        return False
+    return previous.text.decode("utf-8", errors="replace") in _PRIMITIVE_TYPE_NAMES
+
+
 RUST: LanguageDefinition = LanguageDefinition(
     name="rust",
     file_extensions=frozenset({".rs"}),
     comment_node_type="line_comment",
     comment_prefix="//",
     create_parser=_create_rust_parser,
+    # No blanket ``parse_error_hint``: a Rust parse failure usually IS the
+    # user's mistake, unlike C and C++ where the preprocessor makes it routine.
+    # Only this one recognised construct gets its own wording.
+    parse_error_cause=primitive_macro_parse_cause,
 )
 
 
@@ -228,6 +325,9 @@ UNIT_EXPRESSION = "unit_expression"  # ``()``
 
 # Types.
 PRIMITIVE_TYPE = "primitive_type"  # ``i32`` / ``u64`` / ``f64`` / ``bool`` etc.
+#: Tree-sitter's error node. Named in CAPS by the grammar, unlike every other
+#: node type. Used by the parse-error cause detector above.
+ERROR = "ERROR"
 GENERIC_TYPE = "generic_type"  # ``Result<T, E>``
 REFERENCE_TYPE = "reference_type"  # ``&T`` / ``&mut T``
 POINTER_TYPE = "pointer_type"  # ``*const T`` / ``*mut T``

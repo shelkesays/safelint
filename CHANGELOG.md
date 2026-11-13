@@ -7,6 +7,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`sync-development` can no longer deadlock silently (#277).** After the 2.18.0 release the workflow refused to reset `development` and **reported success**, so the branches sat diverged for a whole release cycle with the only trace a workflow annotation. `development` kept the prerelease version and lacked seven fixes that were on `main`; merging further work into it and cutting the next release from it would have regressed them.
+
+  Worse, both remedies its own error message named were already satisfied. "Land that work on main" - it had landed, as a rebase, so the SHAs differed and the guard could not see them. "Dispatch this workflow" - dispatching ran the identical job with the identical guard, and the workflow declared no `inputs`, so there was nothing to override. It took a manual archive plus a force-push past branch protection.
+
+  Three changes, all of them in this release:
+
+  - **A refusal now fails the job.** It exited 0, which in the Actions list is indistinguishable from a sync that worked. A refusal always needs a human to act, so it is actionable by definition and belongs red.
+  - **`workflow_dispatch` gained a `force` input**, which is the escape hatch the refusal message had been promising all along. It still archives `development`'s tip to `archive/development-<sha>` before resetting, so it stays recoverable.
+  - **A content check decides it without a human where it can.** The refusal message had been telling people to run `git cherry origin/main origin/development` and read the answer; the workflow now runs it. When every commit `development` has that `main` lacks is already on `main` under a different SHA, the reset is provably lossless and goes ahead with no version reasoning at all - which is exactly the shape a rebase-merged release leaves behind, and exactly the deadlock above.
+
+    This reverses a decision, so it is worth being precise about what changed. The workflow's own comments record patch-id being **rejected** during the 2.15.0 release, where `git cherry` read 11 commits as not-upstream because a squash merge collapses N commits into a single patch-id matching none of them. That remains true, and it is the reason the check is used **only as a permission**: all `-` approves, anything else falls through to the version + tag guard exactly as before, and a refusal is still a refusal. The predicate can therefore only ever approve a reset the old code would have refused. What was unsound was requiring content equivalence, not consulting it.
+
+    Two readings fail closed rather than being trusted. A patch-id not present on `main` means that commit is on `main` under no SHA. And **fewer comparable patches than commits ahead** means something was not compared: a merge commit and an empty commit each yield none, and a merge's conflict resolution is content that exists in no other commit, so an uncompared commit is an unanswered question.
+
+    **The comparison deliberately does not use `git cherry`**, which would have been the obvious tool and is unsafe here. It computes patch-ids with whitespace **stripped** - `git patch-id`'s default - and exposes no way to change that; `patchid.verbatim` in the config does not reach it (checked on git 2.50). This is a Python project, where indentation is behaviour, so two commits that differ only in indentation share a patch-id and `git cherry` calls them equivalent. Reproduced before relying on it: a commit adding two lines *inside* an `if` and a commit adding the same two lines *after* it print one `-`, which would have let the reset discard a real difference (caught by CodeAnt on #283). The ids are computed with `git patch-id --verbatim` instead, which separates them. For the same reason the refusal summary no longer points at `git cherry` as the way to check by hand: it answers a laxer question than the workflow does.
+
+    **A patch-id says a patch once existed in the history, not that `main` carries it now.** If `main` applied a patch and later reverted it, the patch-id is still in `main`'s history, so a `development` holding an equivalent patch read as "already upstream" and the reset would have discarded a change `main` no longer has (CodeRabbit on #284). Reproduced before fixing: `main` adds a line then reverts it, `development` adds the same line, `main`'s tree ends up without it and the check said lossless. Any patch whose **inverse** also appears in `main`'s history is now dropped from the upstream set rather than trusted.
+
+    Making that work needed `--no-prefix`, which is not cosmetic: `-R` swaps the `a/` and `b/` path prefixes, `--verbatim` hashes the input as given, and the prefix lines are part of it, so a reversed diff and the matching revert commit hashed **differently** while their bodies were byte-identical and the revert went undetected. Dropping both prefixes makes the two directions comparable.
+
+    This catches a revert that is an exact inverse. If unrelated commits changed the surrounding context between the apply and the revert, the revert's diff is no longer the exact inverse, its patch-id does not match, and this will not see it. That residual is recorded beside the code rather than papered over, and it is why archive-then-reset is not optional: a wrong approval stays recoverable from `archive/development-<sha>`, though silently.
+
+    Verified on seven shapes - the real 2.18.0 deadlock (11 commits, every patch already on `main`, now reset automatically), an 18-commit rebase archive (same), a mutation of the deadlock (one extra local commit, refused), the 2.17.1 squash archive (3 of 3 absent, refused, so the 2.15.0 reasoning is preserved rather than overridden), a merge commit (12 of 13 comparable, refused), an empty commit (11 of 12, refused), and the apply-then-revert case above. The merge and empty cases are what make the count check load-bearing rather than belt-and-braces: without it the merge would have been invisible and the other 12 matching patches would have read as proof.
+
+- **CI refuses a change that edits the notes of an already-released version (#278).** Rebasing a feature branch across a release silently rewrites published release notes, and it **never conflicts**, so nothing asks. A branch's entries sit under `## [Unreleased]` -> `### Fixed`; the release workflow renames that heading to `## [X.Y.Z] - <date>` and inserts a fresh empty `[Unreleased]`; a later rebase sees `### Fixed` either side with identical surrounding context and merges the entries into the **dated** section.
+
+  That happened four times in a single day - on the branches for #266, #270, #275 and #276 - and every instance was caught only by diffing the dated sections by hand afterwards. Nothing in the gate could see it: the rebase reported success, the suite passed, and `mkdocs build --strict` passed. Had one merged, a tagged release on PyPI would have grown notes describing work it did not contain.
+
+  The job reads the base branch name through an `env` entry rather than inline `${{ }}` expansion, so a branch name carrying shell metacharacters cannot be spliced into the script before bash sees a quote (template injection; `zizmor` flags it, and `sync-development.yml` already reads `inputs.force` this way for the same reason).
+
+  `scripts/check_changelog_history.py` now asserts that every dated section present in **both** the base branch and the head is byte-identical, including the compare-link footers (those were corrupted once by the same mechanism). Adding a *new* dated section stays allowed, because that is what the release workflow does, and `[Unreleased]` stays freely editable. It runs as a `CHANGELOG history` job on pull requests only, since a push has no base to compare against.
+
+  **Three holes in the guard itself, found in review and fixed before it gated anything.** Worth recording because two of them would have made it worse than useless:
+
+  - **It compared against the base *tip*, which fails valid pull requests.** When a release lands on the base while a branch is open, the base gains a dated section the branch has never seen, and the deleted-section check reported the branch as having *lost published notes* - wrong, and actively misleading, since the branch is merely out of date. It now compares against the **merge base**: the newest state the branch actually diverged from, so a later release is irrelevant while any edit to a section that existed at the branch point is still caught. Pinned by a test, and verified by mutation: restoring the base-tip comparison fails it.
+  - **Duplicate detection was quadratic.** `list.count` per heading rescanned the whole list, so a changelog with many headings cost quadratic CI time on PR-controlled input; it uses `Counter` now.
+  - **A duplicate release heading hid an edit.** Both headings collapse to one key and the last copy wins, so an edited first copy compared equal and passed. A changelog has no legitimate duplicate release heading, so one is now refused outright with the version named.
+  - **Reading the base blob could raise instead of reporting.** `text=True` decodes, so an invalid blob raised `UnicodeDecodeError` out of the checker. It now decodes **strictly** and reports "cannot tell". An intermediate fix used `errors="replace"`, which was worse than the crash it removed: every invalid byte becomes the same U+FFFD, so two *different* undecodable bytes compared equal and an edit between them slipped through silently (`b"x\xff"` and `b"x\xfe"` are distinct bytes and identical after replacement). Refusing to guess is the honest answer, and the third exit state exists so that does not have to be forced into a pass or a fail.
+
+  A fourth report - that a removed compare-link footer slips through - turned out not to hold: footers sit inside the last dated section's body, so removing one changes that section and is already caught. Verified rather than assumed, and left alone.
+
+  A **deleted or renamed** dated heading counts too, not only an edited one. The first implementation compared only versions present in both files, so removing a released section and its notes was never looked at and passed - and a deletion is strictly worse than an edit, since an edit at least leaves something to compare (caught in review on #279).
+
+  Three exit states rather than two, deliberately: 0 intact, 1 a released section was edited or lost, and **2 "could not tell"** (an unreadable base ref, a missing or undecodable file). Collapsing the third into 0 would let a misconfigured job silently stop guarding, which is the exact failure mode the check exists to remove; raising a traceback instead would be nearly as bad, since either way CI stops reporting what it was added for.
+
+### Changed
+
+- **CI: bump `anthropics/claude-code-action` v1.0.269 -> v1.0.271** (folded in from Dependabot PR #285). Still SHA-pinned. The SHA was verified against its **dereferenced** tag object, since these tags are annotated and the naive ref lookup returns the tag object rather than the commit: `refs/tags/v1.0.271` dereferences to commit `4fa93a8`, which is what the PR proposed, and our outgoing pin `61a9c27` is what `v1.0.269` dereferences to. The three upstream commits in the range touch only the bundled Claude Code / Agent SDK version (2.1.319 -> 2.1.322), the lockfiles, and upstream's own release workflow; no action input was added, renamed or removed, so `anthropic_api_key`, `prompt` and `claude_args` in `claude-review.yml` are unaffected. Workflow only - nothing in the published wheel changes.
+
+  **Deliberately not taken to the current latest (v1.0.275), reversing the previous round's habit.** The 2.17.2 bump went straight to the newest tag so the next Dependabot round would have nothing to raise, which was safe then because the whole range was version strings. It is not safe here: **v1.0.273 is published by upstream as "v1.0.273 (breaking changes)"** and carries six of them, including `restrict_untrusted_prs` (a new input defaulting to `true` that denies code-running commands on pull requests from authors without write access) and a switch to running sessions in auto mode by default. Several look like improvements worth having, but adopting a breaking change to the review action is a deliberate decision, not something to absorb silently into a release branch heading for `main`. Dependabot will re-raise v1.0.275, which is the right place to weigh it.
+
+### Fixed
+
+- **SAFE302 reports a Go package-level `var` only when it is actually mutated (#204).** The rule fired on every package-level `var`, which reported a *construct* rather than the hazard it names. Go's `const` accepts only compile-time basic values, so a package-level slice, map, struct or `-ldflags`-written string **cannot** be a `const`: the rule was flagging an idiom with no alternative. Measured on fzf, 120 findings with 97% in library code, the largest non-structural default code in the project.
+
+  The result was the wrong way round, which is the part that made it actively harmful:
+
+  ```go
+  // a.go -> 2 findings, no hazard possible
+  var version = "dev"                             // written by -ldflags; const impossible
+  var defaultShapes = []string{"round", "sharp"}  // a slice cannot be const at all
+
+  // b.go -> 1 finding, the real hazard
+  var counter int
+  func Inc()   { counter++ }
+  func Reset() { counter = 0 }
+  ```
+
+  The harmless file outscored the hazardous one, so triage by count pointed away from the problem. On that example the rule now reports `counter` alone.
+
+  Five shapes count as mutation, each confirmed against the grammar: assignment (`x = v`, `x += v`), increment or decrement, a write to the var's **contents** (`shapes[0] = v`, `cfg.Field = v`, which never rebind the name and would have been missed by a bare-identifier check), address-of (`&x`, which hands mutation rights to whoever receives the pointer even though no write is visible), and the mutating builtins `delete(m, k)` / `clear(m)` / `copy(dst, src)` - caught in review on #276, since those rebind nothing and so appeared in none of the other four. A package-level map emptied by `delete` is shared mutable state just as much as one reassigned. A sentinel error (`var ErrNF = errors.New(...)`) is never reassigned and is now clean - the old test suite asserted that sentinels *should* fire, which was documenting the defect.
+
+  **Three limits, stated rather than left to be discovered.** Mutation is detected per file, as everything in safelint is, so a `var` written only from another file in the same package is missed. The detector is not scope-aware, so a function-local `x := 1; x = 2` keeps a package-level `x` reporting - the conservative direction, preserving the old behaviour for that name rather than inventing a false negative, but it means a finding is not proof the package binding itself was written. And a write through an *arbitrary* function's argument is not recognised: only the builtins are, because anything further needs interprocedural analysis safelint does not do anywhere.
+
+  Same design mistake as #201 (SAFE305 on every JavaScript `var`) and fixed the same way: report where the hazard is observable, and name it in the message. **Bundled skill content changed: run `safelint skill install --force`.**
+
+- **SAFE000 on a Rust `str!` / `i32!` macro now names the real cause instead of blaming your syntax (#174).** `tree-sitter-rust` cannot parse a macro whose name is a primitive type keyword: the lexer resolves the word as a type token before it can be a macro identifier, and `<primitive> !` is not a valid invocation in the grammar. The file gets a `SAFE000` and **every rule reports nothing for it** - worse than a false positive, because a false positive is visible and suppressible while this silently removes a file from analysis. Found on ruff, where 3 affected files sat among 6,066 findings.
+
+  Not obscure: `str!` is [snapbox](https://docs.rs/snapbox)'s inline-snapshot macro, so any crate using inline snapshots loses those files. Still unfixable by a dependency bump, which was checked rather than assumed: `tree-sitter-rust` 0.24.2 remains the latest release on PyPI and still fails.
+
+  So the message changed, not the parsing:
+
+  ```
+  SAFE000 Parse error (syntax error) at line 2, column 23 - a macro named after a
+  primitive type (such as snapbox's `str!`) cannot be parsed by tree-sitter-rust, so
+  this file was NOT analysed; the code itself is valid Rust and there is nothing here to fix
+  ```
+
+  **This is per-cause, not per-language, which is the distinction 2.17.2 explicitly could not make.** C and C++ carry an unconditional `parse_error_hint` because a parse failure there is routinely the preprocessor's doing. Rust cannot: most Rust parse failures genuinely are the user's mistake, so a blanket hint would excuse real errors. `LanguageDefinition` therefore gained `parse_error_cause`, a hook that inspects the tree and recognises one specific construct, and the advice now resolves in three tiers: recognised cause, then the language's blanket hint, then the generic "check syntax".
+
+  **Every** parse error in the file has to be this shape for the cause-specific wording to appear. Claiming it on a first match was wrong in both directions (caught in review on #275): with a genuine error earlier in the file, `SAFE000` reports *that* line while the message said there was nothing to fix, and with the macro first the message is right about its own location but still tells the reader a broken file is fine. A file with a real syntax error as well now falls back to the generic advice, because "nothing here to fix" would be false there.
+
+  Detection covers all three delimiter forms, which recover differently (`str![1]` and `str!(1)` leave the bare `!` as the error with the name beside it; `str!{1}` puts the name *in* the error node), and every primitive name. The opposite error - telling someone their broken code is fine - is what most of the new tests guard: an unbalanced paren, a missing semicolon, a stray brace, an unclosed string and a genuinely broken non-primitive macro all still get the generic advice, and `string!` / `i32x4!` are ordinary identifiers that parse fine.
+
+  Documented in `docs/languages/rust.md` under Limitations, and in the bundled Rust skill addendum, which tells an agent not to rewrite valid source to satisfy the parser and to count `SAFE000` before calling a Rust project clean. **Bundled skill content changed: run `safelint skill install --force`.**
+
 ## [2.18.0] - 2026-11-07
 
 ### Added

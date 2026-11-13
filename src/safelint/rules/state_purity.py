@@ -531,6 +531,99 @@ class GlobalStateRule(BaseRule):
         return violations
 
 
+#: Bound on the descent through ``a.b[i].c`` style mutation targets. Generous
+#: for real Go while keeping the loop provably terminating, since SAFE105 bars
+#: recursion in safelint's own source.
+_GO_MAX_MUTATION_DEPTH = 32
+
+
+def _go_mutation_base_name(node: tree_sitter.Node) -> str | None:
+    """Return the package-level name *node* ultimately mutates, or None.
+
+    Descends through the shapes that mutate a binding's CONTENTS rather than
+    rebinding it, because those are mutations of the shared state too:
+    ``shapes[0] = "x"`` and ``cfg.Field = y`` are exactly the hazard SAFE302
+    names, and stopping at the outermost expression would miss both.
+    """
+    current = node
+    for _ in range(_GO_MAX_MUTATION_DEPTH):
+        if current.type == _go.IDENTIFIER:
+            return node_text(current)
+        if current.type not in (_go.INDEX_EXPRESSION, _go.SELECTOR_EXPRESSION):
+            return None
+        operand = current.child_by_field_name("operand")
+        if operand is None:
+            return None
+        current = operand
+    return None  # pragma: no cover - defensive: a pathologically nested target
+
+
+#: Go builtins that mutate a container passed as their FIRST argument, without
+#: any assignment, increment or address-of to give them away. A package-level
+#: map emptied by ``delete(cache, k)`` is shared mutable state every bit as much
+#: as one reassigned, and before #276's review it was silently unreported.
+#:
+#: ``copy`` writes into its destination; ``delete`` and ``clear`` both take the
+#: container first (``clear`` is Go 1.21+). Deliberately only the builtins: an
+#: arbitrary function that writes through a slice or map argument cannot be
+#: recognised without interprocedural analysis, which safelint does not do
+#: anywhere, and that limit is documented on the language page.
+_GO_MUTATING_BUILTINS: frozenset[str] = frozenset({"delete", "clear", "copy"})
+
+
+def _go_builtin_mutation_target(node: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the first argument of a mutating builtin call, else None."""
+    if node.type != _go.CALL_EXPRESSION:
+        return None
+    function = node.child_by_field_name("function")
+    if function is None or function.type != _go.IDENTIFIER or node_text(function) not in _GO_MUTATING_BUILTINS:
+        return None
+    arguments = node.child_by_field_name("arguments")
+    if arguments is None:
+        return None
+    named = arguments.named_children
+    return named[0] if len(named) > 0 else None
+
+
+def _go_mutated_names(root: tree_sitter.Node) -> set[str]:
+    """Return every name mutated anywhere in the file.
+
+    Four shapes count as mutation, confirmed against tree-sitter-go:
+
+    * ``x = v`` / ``x += v`` - ``assignment_statement``, names under ``left``;
+    * ``x++`` / ``x--`` - ``inc_statement`` / ``dec_statement``;
+    * ``&x`` - ``unary_expression``, which hands mutation rights to whoever
+      receives the pointer, so it has to count even though no write is visible.
+    * ``delete(m, k)`` / ``clear(m)`` / ``copy(dst, src)`` - the mutating
+      builtins, which rebind nothing and so appear in none of the shapes above.
+      A package-level map emptied by ``delete`` is shared mutable state just as
+      much as one reassigned.
+
+    Deliberately NOT scope-aware. A function-local ``x := 1; x = 2`` adds ``x``
+    here even when the package-level ``x`` is untouched, so such a var still
+    reports. That is the conservative direction - it preserves the old
+    behaviour for that name rather than inventing a new false negative - and
+    Go's shadowing rules make the collision rare enough that scope tracking
+    would cost more than it returns.
+    """
+    mutated: set[str] = set()
+    for node in walk(root):
+        if node.type == _go.ASSIGNMENT_STATEMENT:
+            left = node.child_by_field_name("left")
+            targets = left.named_children if left is not None else []
+        elif node.type in (_go.INC_STATEMENT, _go.DEC_STATEMENT):
+            targets = node.named_children
+        elif node.type == _go.UNARY_EXPRESSION and node_text(node).startswith("&"):
+            operand = node.child_by_field_name("operand")
+            targets = [operand] if operand is not None else []
+        elif (builtin_target := _go_builtin_mutation_target(node)) is not None:
+            targets = [builtin_target]
+        else:
+            continue
+        mutated.update(name for name in (_go_mutation_base_name(target) for target in targets) if name is not None)
+    return mutated
+
+
 class GlobalMutationRule(BaseRule):
     """Reject shared module-level / global mutable state.
 
@@ -839,13 +932,14 @@ class GlobalMutationRule(BaseRule):
         of ``source_file``, so iterating the root's named children excludes
         them structurally.
         """
+        mutated = _go_mutated_names(tree.root_node)
         violations: list[Violation] = []
         for node in tree.root_node.named_children:
             if node.type == _go.VAR_DECLARATION:
-                violations.extend(self._go_var_violations(filepath, node))
+                violations.extend(self._go_var_violations(filepath, node, mutated))
         return violations
 
-    def _go_var_violations(self, filepath: str, var_decl: tree_sitter.Node) -> list[Violation]:
+    def _go_var_violations(self, filepath: str, var_decl: tree_sitter.Node, mutated: set[str]) -> list[Violation]:
         """Return violations for every name declared in a package-level ``var`` block.
 
         The single form ``var x int`` holds the ``var_spec`` directly; the
@@ -859,20 +953,20 @@ class GlobalMutationRule(BaseRule):
         out: list[Violation] = []
         for child in var_decl.named_children:
             if child.type == _go.VAR_SPEC:
-                out.extend(self._go_spec_violations(filepath, child))
+                out.extend(self._go_spec_violations(filepath, child, mutated))
             elif child.type == _go.VAR_SPEC_LIST:
-                out.extend(self._go_spec_list_violations(filepath, child))
+                out.extend(self._go_spec_list_violations(filepath, child, mutated))
         return out
 
-    def _go_spec_list_violations(self, filepath: str, spec_list: tree_sitter.Node) -> list[Violation]:
+    def _go_spec_list_violations(self, filepath: str, spec_list: tree_sitter.Node, mutated: set[str]) -> list[Violation]:
         """Return violations for every ``var_spec`` inside a grouped ``var ( ... )`` block."""
         out: list[Violation] = []
         for spec in spec_list.named_children:
             if spec.type == _go.VAR_SPEC:
-                out.extend(self._go_spec_violations(filepath, spec))
+                out.extend(self._go_spec_violations(filepath, spec, mutated))
         return out
 
-    def _go_spec_violations(self, filepath: str, spec: tree_sitter.Node) -> list[Violation]:
+    def _go_spec_violations(self, filepath: str, spec: tree_sitter.Node, mutated: set[str]) -> list[Violation]:
         """Return one violation per declared identifier in a ``var_spec``.
 
         Only the spec's direct ``identifier`` children are names; the type
@@ -886,10 +980,10 @@ class GlobalMutationRule(BaseRule):
             self._make_violation_for_node(
                 filepath,
                 ident,
-                f'Package-level var "{node_text(ident)}" is shared mutable state - scope it to its consumer, or use `const` if it never changes (Power of Ten rule 6)',
+                f'Package-level var "{node_text(ident)}" is mutated after its declaration, so it is shared mutable state - scope it to its consumer (Power of Ten rule 6)',
             )
             for ident in spec.named_children
-            if ident.type == _go.IDENTIFIER and node_text(ident) != _go.BLANK_IDENTIFIER
+            if ident.type == _go.IDENTIFIER and node_text(ident) != _go.BLANK_IDENTIFIER and node_text(ident) in mutated
         ]
 
     def _java_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
