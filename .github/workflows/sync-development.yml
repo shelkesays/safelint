@@ -273,8 +273,21 @@ jobs:
           # Merges are excluded because a merge has no single diff to hash.
           # That omission is deliberate and the caller's count check is what
           # turns it into a refusal rather than a silent gap.
+          #
+          # $2, when given, is passed to `git log` - only ever `-R`, which
+          # reverses each commit's diff and so yields the patch-id an exact
+          # REVERT of that commit would carry.
+          #
+          # `--no-prefix` is what makes that work and is NOT cosmetic. `-R`
+          # swaps the `a/` and `b/` path prefixes, `--verbatim` hashes the
+          # input as given, and the prefix lines are part of it - so a reversed
+          # diff and the matching revert commit hash DIFFERENTLY while their
+          # bodies are byte-identical, and the revert goes undetected. Dropping
+          # both prefixes makes the two directions comparable. It shifts every
+          # id, forward ones included, which costs nothing: both sides of every
+          # comparison here are produced by this same function.
           patch_ids_in() {
-            git log -p --no-merges --format='commit %H' "$1" | git patch-id --verbatim | cut -d' ' -f1
+            git log -p --no-merges --no-prefix --format='commit %H' ${2:+"$2"} "$1" | git patch-id --verbatim | cut -d' ' -f1
           }
 
           # Is every commit development has that main lacks ALREADY on main as
@@ -287,21 +300,37 @@ jobs:
           # rather than refusing on its own, which is why the 2.15.0 squash
           # (where every commit reads as not-upstream) is unaffected.
           #
-          # Two readings are refused rather than trusted:
+          # Three readings are refused rather than trusted:
           #
           #   * a patch-id not present on main - that commit is on main under no
           #     SHA at all;
+          #   * a patch-id present on main but whose INVERSE is also present -
+          #     main applied it and has since reverted it. A patch-id says a
+          #     patch once existed in the history, NOT that main's tree carries
+          #     it now, so without this the reset would discard a change main no
+          #     longer has (CodeRabbit on #284; reproduced before fixing). Any
+          #     such patch is dropped from the upstream set rather than trusted.
           #   * fewer comparable patches than $2 - a merge commit or an empty
           #     commit yields none, and a merge's conflict resolution is content
           #     that exists in no other commit. An uncompared commit is an
           #     unanswered question, so it fails closed.
+          #
+          # The revert exclusion catches a revert that is an EXACT inverse. If
+          # unrelated commits changed the surrounding context between the apply
+          # and the revert, the revert's diff is no longer the exact inverse,
+          # its patch-id does not match, and this will not see it. That residual
+          # is why the archive-then-reset step below is not optional: a wrong
+          # approval here is recoverable from `archive/development-<sha>`,
+          # though silently, which is the whole reason the bar is set at
+          # "provably lossless" rather than "probably fine"
           content_is_upstream() {
-            local base upstream dev_ids classified unmatched pid
+            local base upstream reverted dev_ids classified unmatched undone pid
             if ! base=$(git merge-base "$MAIN" "$1" 2>/dev/null); then
               echo "development and main share no merge base, so their patches cannot be compared"
               return 1
             fi
             upstream=$(patch_ids_in "$base..$MAIN" | sort -u)
+            reverted=$(patch_ids_in "$base..$MAIN" -R | sort -u)
             dev_ids=$(patch_ids_in "$base..$1")
             classified=$(printf '%s\n' "$dev_ids" | grep -c . || true)
             if [ "$classified" -ne "$2" ]; then
@@ -309,10 +338,19 @@ jobs:
               return 1
             fi
             unmatched=0
+            undone=0
             while IFS= read -r pid; do
               [ -n "$pid" ] || continue
-              printf '%s\n' "$upstream" | grep -qxF "$pid" || unmatched=$((unmatched + 1))
+              if ! printf '%s\n' "$upstream" | grep -qxF "$pid"; then
+                unmatched=$((unmatched + 1))
+              elif printf '%s\n' "$reverted" | grep -qxF "$pid"; then
+                undone=$((undone + 1))
+              fi
             done <<< "$dev_ids"
+            if [ "$undone" -ne 0 ]; then
+              echo "$undone of $2 commit(s) are on main only as a patch it has since reverted, so main's current content does not carry them"
+              return 1
+            fi
             if [ "$unmatched" -ne 0 ]; then
               echo "$unmatched of $2 commit(s) are on main under no SHA"
               return 1
