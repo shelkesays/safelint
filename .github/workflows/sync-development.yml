@@ -106,7 +106,7 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: "Reset development to main even when the guard would refuse. The old tip is still archived first."
+        description: "Reset development to main even when the guard would refuse. The old tip is still archived first. Dispatch this from `main`: the release-write environment's branch policy rejects every other ref."
         type: boolean
         default: false
 
@@ -120,32 +120,33 @@ concurrency:
 jobs:
   sync:
     name: Archive development, then reset it to main
-    # Gates this job on the `sync-write` environment, whose required reviewer
-    # must approve before the job starts - and therefore before any code in it
-    # can reach RELEASE_PAT (#282).
+    # RELEASE_PAT is an ENVIRONMENT secret of `release-write`, not a repository
+    # secret, and that environment's deployment branch policy admits `main`
+    # only. Those two facts together are what protect the token (#282):
+    #
+    #   * environment-scoped means no job can read it without declaring this
+    #     environment, so deleting the declaration from a modified copy bypasses
+    #     nothing - it leaves the secret absent instead; and
+    #   * branch-policy-scoped means the declaration only works on a run whose
+    #     ref is `main`, which is a reviewed commit, because the ruleset
+    #     requires a PR with an approving review.
     #
     # The path this closes: `workflow_dispatch` runs the workflow file FROM THE
-    # SELECTED REF, so anyone with write access could dispatch a modified copy
-    # of this job from a branch and have the token handed to it. No guard
-    # written inside the workflow can stop that, because the same person can
-    # delete the guard. An environment approval is outside the workflow's
-    # control, so it can.
+    # SELECTED REF, so anyone with write access could otherwise dispatch a
+    # modified copy of this job from a branch and have the token handed to it.
+    # Dispatching from `main` still works and is how `force` is meant to be
+    # used; dispatching from any other ref now fails at the environment check
+    # before the job starts.
     #
-    # Two honest limits:
-    #
-    #   * RELEASE_PAT is still a REPOSITORY secret, because publish.yml's
-    #     `build` job needs it and is deliberately left ungated so releases do
-    #     not pause. publish.yml also has `workflow_dispatch`, so that route to
-    #     the token is open. Narrowing the token is what reduces the loss there;
-    #     dropping publish.yml's `workflow_dispatch` would close it (its stated
-    #     purpose, re-publishing after a failed upload, is also served by
-    #     re-running the failed job from the Actions UI, which re-runs the same
-    #     commit rather than arbitrary code).
-    #   * This also pauses the ordinary post-release sync until someone
-    #     approves, so `development` stays diverged until then. Acceptable
-    #     because a refusal already needs a human (#277) - but it does mean the
-    #     sync is no longer hands-off.
-    environment: sync-write
+    # The 2.18.1 version of this gate named a `sync-write` environment and
+    # relied on a required reviewer, and the comment here claimed that could not
+    # be bypassed. It could. RELEASE_PAT was a repository secret at the time, so
+    # deleting this single line from a dispatched copy read the same token with
+    # no approval at all. An approval RULE is outside the workflow's control,
+    # but whether a job OPTS IN to it is one line inside the workflow; scoping
+    # the secret is the part that cannot be edited away. Please do not move
+    # RELEASE_PAT back to the repository secrets without re-reading this.
+    environment: release-write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -158,7 +159,9 @@ jobs:
       - name: Archive development, then reset it to main
         env:
           # RELEASE_PAT: force-pushing development needs to bypass its protection
-          # (the default GITHUB_TOKEN cannot). Same token as publish.yml.
+          # (the run's own token cannot). Same token as publish.yml, and like
+          # there it is an environment secret of `release-write`, so it resolves
+          # only because this job declares that environment above.
           RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
           # Read through the environment rather than interpolated into the
           # script body: `inputs.force` is absent on a push trigger, and an
@@ -169,6 +172,15 @@ jobs:
           git fetch origin main development --quiet
 
           MAIN=$(git rev-parse origin/main)
+
+          # Fail loudly rather than attempt an anonymous read-then-push: an
+          # empty PAT means the `release-write` environment lost the secret or
+          # its branch policy rejected this ref, and the resulting
+          # authentication error would name neither.
+          if [ -z "$RELEASE_PAT" ]; then
+            echo "::error::RELEASE_PAT is empty. Check that the release-write environment still holds it and that its deployment branch policy admits this ref (it admits main only, so dispatch this workflow from main)."
+            exit 1
+          fi
 
           # Push via an explicit PAT URL (credentials are not persisted).
           REPO_URL="https://x-access-token:${RELEASE_PAT}@github.com/${GITHUB_REPOSITORY}.git"

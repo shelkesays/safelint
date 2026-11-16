@@ -96,12 +96,26 @@ This is why a merge that does not change the version, or a stray final version o
 
 Already configured for this repo; documented here for reference and for forks:
 
-- **`RELEASE_PAT`** secret - a fine-grained PAT (`contents: write`) used to push
-  the tag / date-stamp commit to protected `main` and to force-push
-  `development`. Its actor must be in the branch-ruleset bypass list.
+- **`release-write` environment** - holds the `RELEASE_PAT` secret, with a
+  deployment branch policy admitting **`main` only** and no reviewer rule. The
+  scoping is the protection, not a convention: a job cannot read the token
+  without declaring this environment, and declaring it only works on a run whose
+  ref is `main`, which is a reviewed commit. Keep the token here rather than in
+  the repository secrets, or every workflow in every ref can read it again
+  (#282).
+- **`RELEASE_PAT`** - a fine-grained PAT on `release-write`, scoped to this
+  repository, with **Contents: read and write** *and* **Workflows: read and
+  write**. Contents pushes the tag / date-stamp commit to protected `main` and
+  force-pushes `development`; Workflows is needed because a release that touches
+  anything under `.github/workflows/` has its push refused without it. Its actor
+  must be in the branch-ruleset bypass list. Fine-grained tokens expire (one year
+  maximum), and GitHub mails a warning seven days ahead.
 - **`pypi` environment** - with a required-reviewer protection rule (the final
   release gate).
-- **`pypi-rc` environment** - no protection rule (hands-off RC publishing).
+- **`pypi-rc` environment** - no protection rule (hands-off RC publishing). The
+  `build` job also declares it on the RC path, as the no-gate counterpart to
+  `release-write`: RCs push only a tag, which the run's own token can do, so no
+  long-lived credential is exposed to them.
 - **PyPI Trusted Publishing** - the trusted-publisher entry (or entries) must
   trust the `publish.yml` workflow from **both** the `pypi` and `pypi-rc`
   environments (leave the Environment field blank for one entry, or add a second
