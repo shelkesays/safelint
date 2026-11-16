@@ -2090,7 +2090,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2181-2026-11-16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.18.1 - 2026-11-16
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.18.1 - 2026-11-16">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4652,7 +4663,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2181-2026-11-16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.18.1 - 2026-11-16
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.18.1 - 2026-11-16">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -7108,7 +7130,8 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.18.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.18.1...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="2181-2026-11-16"><a href="https://github.com/shelkesays/safelint/compare/v2.18.0...v2.18.1">2.18.1</a> - 2026-11-16<a class="headerlink" href="#2181-2026-11-16" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
 <li><strong><code>sync-development</code> can no longer deadlock silently (#277).</strong> After the 2.18.0 release the workflow refused to reset <code>development</code> and <strong>reported success</strong>, so the branches sat diverged for a whole release cycle with the only trace a workflow annotation. <code>development</code> kept the prerelease version and lacked seven fixes that were on <code>main</code>; merging further work into it and cutting the next release from it would have regressed them.</li>
