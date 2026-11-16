@@ -68,14 +68,24 @@ jobs:
     # conflicting, because the subsection headings match either side. That
     # happened four times in one day and every instance was caught by hand.
     #
-    # Pull requests only. On a push there is no base to compare against, and
-    # the release workflow legitimately rewrites `[Unreleased]` into a dated
-    # section as it tags.
+    # The work only happens on a pull request: a push has no base to compare
+    # against, and the release workflow legitimately rewrites `[Unreleased]`
+    # into a dated section as it tags.
+    #
+    # The CONDITION sits on each step rather than on the job, which looks
+    # redundant and is not. A job-level `if` makes the job report `skipped`,
+    # and on a release branch (ci.yml runs on push to `release/*` as well as on
+    # the pull request) that puts two different conclusions on the same commit
+    # for one context name - `skipped` from the push, `success` from the PR.
+    # That is fine while the check is advisory and ambiguous the moment it
+    # becomes a REQUIRED check in the branch ruleset, which is the point of
+    # moving it. Per-step conditions make the job report `success` either way,
+    # with nothing heavy executed on a push.
     name: CHANGELOG history
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        if: github.event_name == 'pull_request'
         with:
           # The base branch has to be reachable for `git show <base>:CHANGELOG.md`,
           # and a shallow clone does not contain it.
@@ -83,10 +93,12 @@ jobs:
           persist-credentials: false
 
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+        if: github.event_name == 'pull_request'
         with:
           python-version: "3.12"
 
       - name: Released CHANGELOG sections are unchanged
+        if: github.event_name == 'pull_request'
         # The base branch name reaches the shell through the environment, not
         # through inline `${{ }}` expansion. A branch name can carry shell
         # metacharacters, and an inline expansion would splice them into the
