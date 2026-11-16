@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **The `RELEASE_PAT` environment gate shipped in 2.18.1 did not work, and the comment beside it claimed that it could not be bypassed (#282).** `sync-development.yml`'s job declared `environment: sync-write` so a required reviewer had to approve before any code in that job could reach the token. Deleting one line defeats it. `RELEASE_PAT` was a **repository** secret, so every job in every workflow could read it whatever environment it declared, and a dispatched copy of the job with the `environment:` line removed was handed the same token with no approval. The comment asserted the opposite, that "an environment approval is outside the workflow's control, so it can" stop that. The approval *rule* is outside the workflow's control; whether a job *opts in* to it is one line inside the workflow.
+
+  What makes the gate load-bearing is scoping the secret, not gating the job:
+
+  - `RELEASE_PAT` is now an **environment secret** of a new `release-write` environment. A job that does not declare that environment cannot read it at all, so deleting the declaration leaves the secret absent rather than unguarded.
+  - `release-write` carries a **deployment branch policy admitting `main` only**, and no reviewer rule. Arbitrary workflow code can only live on a ref that is not `main`, so the policy excludes every route it had: a dispatch from a feature branch is rejected before the job starts, and so is a `pull_request` run, whose ref is `refs/pull/N/merge`. A dispatch from `main` runs `main`'s reviewed copy of the file, and getting modified code onto `main` needs a PR with an approving review, which was already the trust boundary.
+  - Dropping the reviewer also undoes the regression 2.18.1 introduced. The post-release sync is hands-off again instead of waiting for an approval before `development` catches up.
+
+- **`publish.yml` no longer has a `workflow_dispatch` trigger (#282).** This was the wider route to the token, and the limit 2.18.1 recorded without closing: the `build` job reads `RELEASE_PAT` and was deliberately left ungated so releases would not pause, so a dispatch of a modified copy from any ref was simply handed it. Its stated purpose, re-publishing after a PyPI upload failed once the tag already existed, is served by "Re-run failed jobs" in the Actions UI, which re-runs the recorded commit instead of arbitrary code.
+
+- **RC releases no longer touch `RELEASE_PAT` at all (#282).** An RC's only write is pushing its tag, and no ruleset on this repository targets tags, so that goes through the run's own ephemeral token now. Only the final path needs the PAT, for the atomic date-stamp-commit-plus-tag push to protected `main` that the run's own token cannot perform. The `build` job therefore declares `release-write` on finals and the rule-free `pypi-rc` on RCs, which keeps RC releases hands-off and exposes no long-lived credential to them.
+
+  Both reads of the token now fail loudly on an empty value rather than attempting an anonymous push. An empty `RELEASE_PAT` means the environment lost the secret or its branch policy rejected the ref, and the authentication error that would otherwise surface names neither.
+
+- **Considered and rejected: removing `RELEASE_PAT` entirely** by adding GitHub Actions to the rulesets' bypass list, so the run's own token could push to protected `main` and `development`. That is wider rather than narrower. It hands `main`-write to every workflow on every ref automatically, with no secret left to scope and nothing to restrict by branch. A narrow PAT behind a branch-restricted environment is the better shape.
+
+- **`RELEASE_PAT` reissued as a fine-grained token (#282),** scoped to this repository alone with Contents and Workflows write, replacing a classic PAT whose scopes covered every repository the account can reach. Workflows write is not optional: a release that touches anything under `.github/workflows/`, as 2.18.1 did, has its push refused without it.
+
 ## [2.18.1] - 2026-11-16
 
 ### Added

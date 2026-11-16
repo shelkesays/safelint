@@ -251,6 +251,12 @@ With piece A running server-side, this is normally just a fast-forward + a green
 
 ## 4. One-time setup (owner)
 
+> Historical. This is the list as planned; the setup that was actually built has
+> since moved `RELEASE_PAT` out of the repository secrets and into a
+> `release-write` environment restricted to `main` (#282), and the token also
+> needs `workflows: write`. See `docs/contributing/releasing.md` for the current
+> arrangement.
+
 1. **`RELEASE_PAT` secret** (or a GitHub App token): a fine-grained PAT scoped to
    this repo with `contents: write`. Used by piece A to force-push `development`.
    Piece B does **not** need it (release runs entirely in one workflow via

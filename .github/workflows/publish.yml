@@ -27,8 +27,13 @@ name: Publish to PyPI
 on:
   push:
     branches: [main, development]
-  # Manual re-publish safety net (e.g. PyPI upload failed after the tag existed).
-  workflow_dispatch:
+
+# Deliberately NO `workflow_dispatch`. A dispatch runs the workflow file FROM
+# THE SELECTED REF, so it was a route for anyone with write access to hand
+# arbitrary job code the release credentials (#282). Its stated purpose,
+# re-publishing after a PyPI upload failed once the tag existed, is served by
+# "Re-run failed jobs" in the Actions UI, which re-runs the recorded commit
+# rather than arbitrary code.
 
 permissions:
   contents: read
@@ -98,6 +103,24 @@ jobs:
     needs: gate
     if: needs.gate.outputs.release == 'true'
     runs-on: ubuntu-latest
+    environment:
+      # This job holds RELEASE_PAT on the final path, so it has to declare the
+      # environment that owns it. RELEASE_PAT is an ENVIRONMENT secret of
+      # `release-write` whose deployment branch policy admits `main` only, which
+      # is what actually protects it (#282): the secret is unreadable without
+      # the declaration, and the declaration only works on a run whose ref is
+      # `main`, i.e. a reviewed commit.
+      #
+      # RCs never need the token - their only write is a tag push, done with the
+      # run's own ephemeral token below - so they deploy to the rule-free
+      # `pypi-rc` instead. That keeps RC releases hands-off and keeps this
+      # expression resolving to a real name in both directions, which an
+      # environment declaration requires.
+      name: ${{ needs.gate.outputs.prerelease == 'true' && 'pypi-rc' || 'release-write' }}
+
+    permissions:
+      contents: write  # the RC tag push, via the run's own token
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -116,18 +139,34 @@ jobs:
         env:
           VERSION: ${{ needs.gate.outputs.version }}
           PRERELEASE: ${{ needs.gate.outputs.prerelease }}
-          # RELEASE_PAT is needed to push the CHANGELOG date-stamp commit and the
-          # tag to protected main (the default GITHUB_TOKEN cannot bypass the
-          # branch ruleset). Passed as an env var + explicit URL, never persisted.
+          # Finals push the CHANGELOG date-stamp commit to protected main, which
+          # the run's own token cannot do (it is not in the ruleset's bypass
+          # list), so that path needs RELEASE_PAT. Being an environment secret of
+          # `release-write`, it resolves ONLY on the final path, where this job
+          # deploys there - on the RC path it is empty by construction rather
+          # than by convention. Passed as an env var + explicit URL, never
+          # persisted.
           RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
+          # RCs only push a tag, and no ruleset targets tags, so the run's own
+          # ephemeral token is enough and no long-lived credential is exposed to
+          # the RC path at all.
+          RUN_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          REPO_URL="https://x-access-token:${RELEASE_PAT}@github.com/${GITHUB_REPOSITORY}.git"
 
           COMMITTED=false
           if [ "$PRERELEASE" = "false" ]; then
+            # Fail loudly rather than attempt an anonymous push: an empty PAT
+            # here means the environment lost the secret or its branch policy
+            # rejected this ref, and a bare authentication error says neither.
+            if [ -z "$RELEASE_PAT" ]; then
+              echo "::error::RELEASE_PAT is empty on the final path. Check that the release-write environment still holds it and that its deployment branch policy admits main."
+              exit 1
+            fi
+            PUSH_TOKEN="$RELEASE_PAT"
+
             DATE=$(date -u +%Y-%m-%d)
             python3 scripts/date_changelog.py "$VERSION" "$DATE"
             if ! git diff --quiet -- CHANGELOG.md; then
@@ -135,7 +174,10 @@ jobs:
               git commit -m "chore: date CHANGELOG for v$VERSION"
               COMMITTED=true
             fi
+          else
+            PUSH_TOKEN="$RUN_TOKEN"
           fi
+          REPO_URL="https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
           # Tag the (possibly date-stamped) HEAD. When a CHANGELOG commit was
           # made, push the tag AND the branch commit ATOMICALLY so the tag can
