@@ -120,6 +120,32 @@ concurrency:
 jobs:
   sync:
     name: Archive development, then reset it to main
+    # Gates this job on the `sync-write` environment, whose required reviewer
+    # must approve before the job starts - and therefore before any code in it
+    # can reach RELEASE_PAT (#282).
+    #
+    # The path this closes: `workflow_dispatch` runs the workflow file FROM THE
+    # SELECTED REF, so anyone with write access could dispatch a modified copy
+    # of this job from a branch and have the token handed to it. No guard
+    # written inside the workflow can stop that, because the same person can
+    # delete the guard. An environment approval is outside the workflow's
+    # control, so it can.
+    #
+    # Two honest limits:
+    #
+    #   * RELEASE_PAT is still a REPOSITORY secret, because publish.yml's
+    #     `build` job needs it and is deliberately left ungated so releases do
+    #     not pause. publish.yml also has `workflow_dispatch`, so that route to
+    #     the token is open. Narrowing the token is what reduces the loss there;
+    #     dropping publish.yml's `workflow_dispatch` would close it (its stated
+    #     purpose, re-publishing after a failed upload, is also served by
+    #     re-running the failed job from the Actions UI, which re-runs the same
+    #     commit rather than arbitrary code).
+    #   * This also pauses the ordinary post-release sync until someone
+    #     approves, so `development` stays diverged until then. Acceptable
+    #     because a refusal already needs a human (#277) - but it does mean the
+    #     sync is no longer hands-off.
+    environment: sync-write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
